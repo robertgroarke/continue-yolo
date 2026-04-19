@@ -76,9 +76,11 @@ export function getContinueGlobalPath(): string {
 }
 
 export function getSessionsFolderPath(): string {
-  const sessionsPath = path.join(getContinueGlobalPath(), "sessions");
+  const sessionsPath =
+    process.env.CONTINUE_SESSION_DIR ||
+    path.join(getContinueGlobalPath(), "sessions");
   if (!fs.existsSync(sessionsPath)) {
-    fs.mkdirSync(sessionsPath);
+    fs.mkdirSync(sessionsPath, { recursive: true });
   }
   return sessionsPath;
 }

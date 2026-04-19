@@ -10,8 +10,9 @@ import type { FileEdit } from "core";
 export class ContinueGUIWebviewViewProvider
   implements vscode.WebviewViewProvider
 {
-  public static readonly viewType = "continue.continueGUIView";
+  public static readonly viewType = "continueYolo.continueGUIView";
   public webviewProtocol: VsCodeWebviewProtocol;
+  private _webviewPanel?: vscode.WebviewPanel;
 
   public get isReady(): boolean {
     return !!this.webview;
@@ -22,9 +23,8 @@ export class ContinueGUIWebviewViewProvider
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken,
   ): void | Thenable<void> {
-    this.webviewProtocol.webview = webviewView.webview;
     this._webviewView = webviewView;
-    this._webview = webviewView.webview;
+    this.attachWebview(webviewView.webview);
     webviewView.webview.html = this.getSidebarContent(
       this.extensionContext,
       webviewView,
@@ -35,7 +35,7 @@ export class ContinueGUIWebviewViewProvider
   private _webviewView?: vscode.WebviewView;
 
   get isVisible() {
-    return this._webviewView?.visible;
+    return this._webviewPanel?.visible ?? this._webviewView?.visible;
   }
 
   get webview() {
@@ -43,11 +43,21 @@ export class ContinueGUIWebviewViewProvider
   }
 
   public resetWebviewProtocolWebview(): void {
+    if (this._webviewPanel) {
+      this.attachWebview(this._webviewPanel.webview);
+      return;
+    }
+
+    if (this._webviewView) {
+      this.attachWebview(this._webviewView.webview);
+      return;
+    }
+
     if (!this._webview) {
       console.warn("no webview found during reset");
       return;
     }
-    this.webviewProtocol.webview = this._webview;
+    this.attachWebview(this._webview);
   }
 
   sendMainUserInput(input: string) {
@@ -62,6 +72,57 @@ export class ContinueGUIWebviewViewProvider
     private readonly extensionContext: vscode.ExtensionContext,
   ) {
     this.webviewProtocol = new VsCodeWebviewProtocol();
+  }
+
+  private attachWebview(webview: vscode.Webview) {
+    this._webview = webview;
+    this.webviewProtocol.webview = webview;
+  }
+
+  public async openEditorTab(): Promise<vscode.WebviewPanel> {
+    if (this._webviewPanel) {
+      this._webviewPanel.reveal(vscode.ViewColumn.Active);
+      this.attachWebview(this._webviewPanel.webview);
+      return this._webviewPanel;
+    }
+
+    const panel = vscode.window.createWebviewPanel(
+      ContinueGUIWebviewViewProvider.viewType,
+      "Continue",
+      vscode.ViewColumn.Active,
+      {
+        retainContextWhenHidden: true,
+        enableScripts: true,
+      },
+    );
+
+    this._webviewPanel = panel;
+    panel.iconPath = vscode.Uri.joinPath(
+      getExtensionUri(),
+      "media",
+      "sidebar-icon.png",
+    );
+    this.attachWebview(panel.webview);
+    panel.webview.html = this.getSidebarContent(
+      this.extensionContext,
+      panel,
+      undefined,
+      undefined,
+      true,
+    );
+
+    panel.onDidDispose(() => {
+      if (this._webviewPanel === panel) {
+        this._webviewPanel = undefined;
+        this._webview = undefined;
+      }
+    });
+
+    return panel;
+  }
+
+  public closeEditorTab(): void {
+    this._webviewPanel?.dispose();
   }
 
   getSidebarContent(

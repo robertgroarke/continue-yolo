@@ -94,9 +94,14 @@ const migrations: MigrationManifest = {
   },
 };
 
+function getWorkspacePersistKey(): string {
+  const workspaceId = window.workspacePaths?.[0] || window.windowId || "global";
+  return `root:${workspaceId}`;
+}
+
 const persistConfig = {
   version: 1,
-  key: "root",
+  key: getWorkspacePersistKey(),
   storage,
   transforms: [...saveSubsetFilters],
   stateReconciler: autoMergeLevel2,

@@ -123,7 +123,7 @@ export function isUnsupportedPlatform(): {
 
 export function getAltOrOption() {
   if (getPlatform() === "mac") {
-    return "⌥";
+    return "âŒ¥";
   } else {
     return "Alt";
   }
@@ -133,7 +133,7 @@ export function getMetaKeyLabel() {
   const platform = getPlatform();
   switch (platform) {
     case "mac":
-      return "⌘";
+      return "âŒ˜";
     case "linux":
     case "windows":
       return "Ctrl";
@@ -156,7 +156,7 @@ export function getMetaKeyName() {
 }
 
 export function getExtensionVersion(): string {
-  const extension = vscode.extensions.getExtension("continue.continue");
+  const extension = vscode.extensions.getExtension("continueYolo.continue");
   return extension?.packageJSON.version || "0.1.0";
 }
 

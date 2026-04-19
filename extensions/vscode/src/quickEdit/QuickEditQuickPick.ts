@@ -201,14 +201,17 @@ export class QuickEdit {
       const { label } = quickPick.selectedItems[0];
       switch (label) {
         case UserPromptLabels.AcceptAll:
-          vscode.commands.executeCommand("continue.acceptDiff", path);
+          vscode.commands.executeCommand("continueYolo.acceptDiff", path);
           break;
         case UserPromptLabels.RejectAll:
-          vscode.commands.executeCommand("continue.rejectDiff", path);
+          vscode.commands.executeCommand("continueYolo.rejectDiff", path);
           break;
         case QuickEditInitialItemLabels.Submit:
           if (quickPick.value) {
-            await vscode.commands.executeCommand("continue.rejectDiff", path);
+            await vscode.commands.executeCommand(
+              "continueYolo.rejectDiff",
+              path,
+            );
             const newPrompt = quickPick.value;
             appendToHistory(newPrompt, this.context);
             this.handleUserPrompt(newPrompt, path);
@@ -365,7 +368,7 @@ export class QuickEdit {
     const initialItems = this.getInitialItems();
     quickPick.items = initialItems;
     quickPick.placeholder =
-      "Enter a prompt to edit your code (@ to search files, ⏎ to submit)";
+      "Enter a prompt to edit your code (@ to search files, âŽ to submit)";
     quickPick.title = this.getQuickPickTitle();
     quickPick.ignoreFocusOut = true;
     quickPick.value = this.initialPrompt ?? "";

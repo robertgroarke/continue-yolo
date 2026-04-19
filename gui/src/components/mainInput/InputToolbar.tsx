@@ -11,6 +11,7 @@ import {
 } from "core/llm/autodetect";
 import { memo, useContext, useRef } from "react";
 import { IdeMessengerContext } from "../../context/IdeMessenger";
+import { usePermissionMode } from "../../hooks/usePermissionMode";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
 import { selectUseActiveFile } from "../../redux/selectors";
 import { selectSelectedChatModel } from "../../redux/slices/configSlice";
@@ -70,6 +71,7 @@ function InputToolbar(props: InputToolbarProps) {
     );
 
   const supportsReasoning = modelSupportsReasoning(defaultModel);
+  const { isBypassPermissions, togglePermissionMode } = usePermissionMode();
 
   const smallFont = useFontSize(-2);
   const tinyFont = useFontSize(-3);
@@ -175,6 +177,27 @@ function InputToolbar(props: InputToolbarProps) {
           }}
         >
           {!isInEdit && <ContextStatus />}
+          {!isInEdit && props.isMainInput && (
+            <ToolTip
+              place="top"
+              content={
+                isBypassPermissions
+                  ? "Automatically accept all tool permissions in Continue YOLO"
+                  : "Require manual approval for tool permissions in Continue YOLO"
+              }
+            >
+              <Button
+                variant={isBypassPermissions ? "outline" : "secondary"}
+                size="sm"
+                onClick={togglePermissionMode}
+                type="button"
+              >
+                {isBypassPermissions
+                  ? "Bypass permissions"
+                  : "Ask for permission"}
+              </Button>
+            </ToolTip>
+          )}
           {!props.toolbarOptions?.hideUseCodebase && !isInEdit && (
             <div className="hidden transition-colors duration-200 hover:underline md:flex">
               <HoverItem

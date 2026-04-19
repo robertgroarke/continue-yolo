@@ -67,6 +67,22 @@ import type { VsCodeWebviewProtocol } from "../webviewProtocol";
 
 export class VsCodeExtension {
   // Currently some of these are public so they can be used in testing (test/test-suites)
+  private static readonly SETTINGS_MIGRATION_STATE_KEY =
+    "continueYolo.settingsMigratedFromContinue";
+  private static readonly MIGRATED_SETTINGS = [
+    "telemetryEnabled",
+    "showInlineTip",
+    "disableQuickFix",
+    "enableQuickActions",
+    "enableTabAutocomplete",
+    "enableNextEdit",
+    "pauseTabAutocompleteOnBattery",
+    "pauseCodebaseIndexOnStart",
+    "enableConsole",
+    "remoteConfigServerUrl",
+    "userToken",
+    "remoteConfigSyncPeriod",
+  ] as const;
 
   private configHandler: ConfigHandler;
   private extensionContext: vscode.ExtensionContext;
@@ -86,6 +102,81 @@ export class VsCodeExtension {
   private completionProvider: ContinueCompletionProvider;
 
   private ARBITRARY_TYPING_DELAY = 2000;
+
+  private initializeWorkspaceSessionStorage(context: vscode.ExtensionContext) {
+    const workspaceStorageUri =
+      context.storageUri ??
+      vscode.Uri.joinPath(
+        context.globalStorageUri,
+        "workspace-session-fallback",
+      );
+
+    fs.mkdirSync(workspaceStorageUri.fsPath, { recursive: true });
+    process.env.CONTINUE_SESSION_DIR = path.join(
+      workspaceStorageUri.fsPath,
+      "sessions",
+    );
+  }
+
+  private async migrateLegacySettings(context: vscode.ExtensionContext) {
+    if (
+      context.globalState.get<boolean>(
+        VsCodeExtension.SETTINGS_MIGRATION_STATE_KEY,
+      )
+    ) {
+      return;
+    }
+
+    const legacyConfig = vscode.workspace.getConfiguration("continue");
+    const yoloConfig = vscode.workspace.getConfiguration(EXTENSION_NAME);
+
+    for (const key of VsCodeExtension.MIGRATED_SETTINGS) {
+      const legacyInspect = legacyConfig.inspect(key);
+      const yoloInspect = yoloConfig.inspect(key);
+
+      if (!legacyInspect) {
+        continue;
+      }
+
+      if (
+        yoloInspect?.globalValue === undefined &&
+        legacyInspect.globalValue !== undefined
+      ) {
+        await yoloConfig.update(
+          key,
+          legacyInspect.globalValue,
+          vscode.ConfigurationTarget.Global,
+        );
+      }
+
+      if (
+        yoloInspect?.workspaceValue === undefined &&
+        legacyInspect.workspaceValue !== undefined
+      ) {
+        await yoloConfig.update(
+          key,
+          legacyInspect.workspaceValue,
+          vscode.ConfigurationTarget.Workspace,
+        );
+      }
+
+      if (
+        yoloInspect?.workspaceFolderValue === undefined &&
+        legacyInspect.workspaceFolderValue !== undefined
+      ) {
+        await yoloConfig.update(
+          key,
+          legacyInspect.workspaceFolderValue,
+          vscode.ConfigurationTarget.WorkspaceFolder,
+        );
+      }
+    }
+
+    await context.globalState.update(
+      VsCodeExtension.SETTINGS_MIGRATION_STATE_KEY,
+      true,
+    );
+  }
 
   /**
    * This is how you turn next edit on or off at the extension level.
@@ -142,7 +233,7 @@ export class VsCodeExtension {
             );
           } else if (selection === "Select different model") {
             vscode.commands.executeCommand(
-              "continue.openTabAutocompleteConfigMenu",
+              "continueYolo.openTabAutocompleteConfigMenu",
             );
           }
         });
@@ -194,6 +285,8 @@ export class VsCodeExtension {
     this.ideUtils = new VsCodeIdeUtils();
     this.extensionContext = context;
     this.windowId = uuidv4();
+    this.initializeWorkspaceSessionStorage(context);
+    void this.migrateLegacySettings(context);
 
     // Check if model supports next edit to determine if we should use full file diff.
     const getUsingFullFileDiff = async () => {
@@ -262,16 +355,6 @@ export class VsCodeExtension {
       this.extensionContext,
     );
 
-    // Sidebar
-    context.subscriptions.push(
-      vscode.window.registerWebviewViewProvider(
-        "continue.continueGUIView",
-        this.sidebar,
-        {
-          webviewOptions: { retainContextWhenHidden: true },
-        },
-      ),
-    );
     resolveWebviewProtocol(this.sidebar.webviewProtocol);
 
     const inProcessMessenger = new InProcessMessenger<
@@ -414,7 +497,7 @@ export class VsCodeExtension {
 
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(
-        "continue.continueConsoleView",
+        "continueYolo.continueConsoleView",
         this.consoleView,
       ),
     );
@@ -564,7 +647,7 @@ export class VsCodeExtension {
       if (e.provider.id === env.AUTH_TYPE) {
         void vscode.commands.executeCommand(
           "setContext",
-          "continue.isSignedInToControlPlane",
+          "continueYolo.isSignedInToControlPlane",
           true,
         );
 
@@ -575,7 +658,7 @@ export class VsCodeExtension {
       } else {
         void vscode.commands.executeCommand(
           "setContext",
-          "continue.isSignedInToControlPlane",
+          "continueYolo.isSignedInToControlPlane",
           false,
         );
 

@@ -17,6 +17,7 @@ type LocalStorageTypes = {
   disableIndexing: boolean;
   hasExitedFreeTrial: boolean;
   hasDismissedCliInstallBanner: boolean;
+  permissionMode: "ask" | "bypass";
 };
 
 export enum LocalStorageKey {
@@ -25,10 +26,15 @@ export enum LocalStorageKey {
   HasExitedFreeTrial = "hasExitedFreeTrial",
 }
 
+function getWorkspaceLocalStorageKey(key: string): string {
+  const workspaceId = window.workspacePaths?.[0] || window.windowId || "global";
+  return `continue.workspace.${workspaceId}.${key}`;
+}
+
 export function getLocalStorage<T extends keyof LocalStorageTypes>(
   key: T,
 ): LocalStorageTypes[T] | undefined {
-  const value = localStorage.getItem(key);
+  const value = localStorage.getItem(getWorkspaceLocalStorageKey(key));
 
   if (value === null) {
     return undefined;
@@ -49,7 +55,7 @@ export function setLocalStorage<T extends keyof LocalStorageTypes>(
   key: T,
   value: LocalStorageTypes[T],
 ): void {
-  localStorage.setItem(key, JSON.stringify(value));
+  localStorage.setItem(getWorkspaceLocalStorageKey(key), JSON.stringify(value));
 
   // Dispatch custom event to notify current tab listeners
   window.dispatchEvent(

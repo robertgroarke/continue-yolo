@@ -1,7 +1,9 @@
+import { useEffect, useRef } from "react";
 import { useAppDispatch, useAppSelector } from "../../../../redux/hooks";
 import { selectPendingToolCalls } from "../../../../redux/selectors/selectToolCalls";
 import { callToolById } from "../../../../redux/thunks/callToolById";
 import { cancelToolCallThunk } from "../../../../redux/thunks/cancelToolCall";
+import { usePermissionMode } from "../../../../hooks/usePermissionMode";
 import { getAltKeyLabel, getMetaKeyLabel, isJetBrains } from "../../../../util";
 import { Button } from "../../../ui";
 import { useMainEditor } from "../../TipTapEditor";
@@ -18,6 +20,38 @@ export function PendingToolCallToolbar() {
   const jetbrains = isJetBrains();
   const pendingToolCalls = useAppSelector(selectPendingToolCalls);
   const editor = useMainEditor();
+  const autoApprovedToolCalls = useRef(new Set<string>());
+  const { isBypassPermissions } = usePermissionMode();
+
+  useEffect(() => {
+    if (!isBypassPermissions) {
+      return;
+    }
+
+    const pendingIds = new Set(
+      pendingToolCalls.map((toolCall) => toolCall.toolCallId),
+    );
+
+    for (const toolCall of pendingToolCalls) {
+      if (autoApprovedToolCalls.current.has(toolCall.toolCallId)) {
+        continue;
+      }
+
+      autoApprovedToolCalls.current.add(toolCall.toolCallId);
+      void dispatch(
+        callToolById({
+          toolCallId: toolCall.toolCallId,
+          isAutoApproved: true,
+        }),
+      );
+    }
+
+    for (const toolCallId of autoApprovedToolCalls.current) {
+      if (!pendingIds.has(toolCallId)) {
+        autoApprovedToolCalls.current.delete(toolCallId);
+      }
+    }
+  }, [dispatch, isBypassPermissions, pendingToolCalls]);
 
   if (pendingToolCalls.length === 0) {
     return null;

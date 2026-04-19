@@ -18,7 +18,7 @@ const SVG_CONFIG = {
   radius: 3,
   leftMargin: 40,
   debounceDelay: 500,
-  label: "📍 Press Tab to jump, Esc to cancel",
+  label: "ðŸ“ Press Tab to jump, Esc to cancel",
 
   // Convert getters to methods that are called when needed
   getFontSize(): number {
@@ -91,7 +91,7 @@ export class JumpManager {
     // Build the first SVG icon
     this._createSvgJumpIcon();
 
-    // Re‑build when the colour theme changes
+    // Reâ€‘build when the colour theme changes
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("workbench.colorTheme")) {
         this._theme = getTheme();
@@ -318,7 +318,7 @@ export class JumpManager {
     // Set the context key to enable tab/esc shortcuts.
     await vscode.commands.executeCommand(
       "setContext",
-      "continue.jumpDecorationVisible",
+      "continueYolo.jumpDecorationVisible",
       true,
     );
     this._jumpDecorationVisible = true;
@@ -339,7 +339,7 @@ export class JumpManager {
     // Reset the context.
     await vscode.commands.executeCommand(
       "setContext",
-      "continue.jumpDecorationVisible",
+      "continueYolo.jumpDecorationVisible",
       false,
     );
     this._jumpDecorationVisible = false;
@@ -350,7 +350,7 @@ export class JumpManager {
     jumpPosition: vscode.Position,
   ) {
     const acceptJumpCommand = vscode.commands.registerCommand(
-      "continue.acceptJump",
+      "continueYolo.acceptJump",
       async () => {
         if (this._jumpDecorationVisible) {
           this._jumpAccepted = true;
@@ -372,7 +372,7 @@ export class JumpManager {
     );
 
     const rejectJumpCommand = vscode.commands.registerCommand(
-      "continue.rejectJump",
+      "continueYolo.rejectJump",
       async () => {
         if (this._jumpDecorationVisible) {
           console.debug(
@@ -404,7 +404,7 @@ export class JumpManager {
           this._oldCursorPosition &&
           !currentPosition.isEqual(this._oldCursorPosition)
         ) {
-          vscode.commands.executeCommand("continue.rejectJump");
+          vscode.commands.executeCommand("continueYolo.rejectJump");
         }
       });
 

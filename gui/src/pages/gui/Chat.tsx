@@ -435,7 +435,7 @@ export function Chat() {
     [sendInput, isLastUserInput, history, stepsOpen, isStreaming],
   );
 
-  const showScrollbar = showChatScrollbar ?? window.innerHeight > 5000;
+  const showScrollbar = showChatScrollbar ?? true;
 
   return (
     <>
@@ -444,7 +444,7 @@ export function Chat() {
 
       <StepsDiv
         ref={stepsDivRef}
-        className={`overflow-y-scroll pt-[8px] ${showScrollbar ? "thin-scrollbar" : "no-scrollbar"} ${history.length > 0 ? "flex-1" : ""}`}
+        className={`min-h-0 overflow-y-auto pt-[8px] ${showScrollbar ? "thin-scrollbar" : "no-scrollbar"} ${history.length > 0 ? "flex-1" : ""}`}
       >
         {highlights}
         {history
