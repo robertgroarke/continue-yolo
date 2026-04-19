@@ -1,27 +1,27 @@
 {
   "name": "continue-yolo",
   "icon": "media/icon.png",
-  "author": "Continue Dev, Inc",
+  "author": "Robert Groarke",
   "version": "1.3.38",
   "repository": {
     "type": "git",
-    "url": "https://github.com/continuedev/continue"
+    "url": "https://github.com/robertgroarke/continue-yolo"
   },
   "extensionKind": [
     "ui",
     "workspace"
   ],
   "bugs": {
-    "url": "https://github.com/continuedev/continue/issues",
-    "email": "nate@continue.dev"
+    "url": "https://github.com/robertgroarke/continue-yolo/issues",
+    "email": "robertgroarke@gmail.com"
   },
-  "homepage": "https://continue.dev",
-  "qna": "https://github.com/continuedev/continue/issues/new/choose",
+  "homepage": "https://github.com/robertgroarke/continue-yolo",
+  "qna": "https://github.com/robertgroarke/continue-yolo/issues/new/choose",
   "license": "Apache-2.0",
-  "displayName": "Continue YOLO",
+  "displayName": "Continue YOLO (Unofficial)",
   "pricing": "Free",
-  "description": "Custom Continue build with YOLO execution and tab-first UX",
-  "publisher": "Continue",
+  "description": "Unofficial Continue fork with YOLO execution, tab-first UX, and workspace-scoped sessions",
+  "publisher": "robertgroarke",
   "engines": {
     "vscode": "^1.70.0",
     "node": ">=20.20.1"

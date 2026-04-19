@@ -1,6 +1,6 @@
 <div align="center"></div>
 
-<h1 align="center">Continue</h1>
+<h1 align="center">Continue YOLO Fork</h1>
 
 <div align="center">
 
@@ -16,11 +16,35 @@
 
 <p></p>
 
-**Source-controlled AI checks, enforceable in CI**
+**Unofficial fork of Continue with tab-first chat and configurable permission bypass**
 
 </div>
 
 ![Banner](media/github-readme.png)
+
+## Fork Notice
+
+This repository is an unofficial fork of [`continuedev/continue`](https://github.com/continuedev/continue).
+
+It is not affiliated with, endorsed by, or supported by Continue Dev, Inc.
+
+This fork adds custom Antigravity-focused behavior, including:
+
+- a tab-first VS Code/Antigravity chat experience
+- workspace-scoped session persistence
+- a configurable permissions mode with optional approval bypass
+
+For the upstream project, documentation, and official releases, use the original Continue repository.
+
+## Differences from Continue
+
+Compared with stock Continue, this fork changes extension behavior in a few important ways:
+
+- `Continue YOLO` is intended to run as a separate extension alongside the official Continue extension, not replace it.
+- Chat opens from an editor-tab workflow instead of primarily relying on the sidebar webview.
+- Chat/session persistence is scoped to the active workspace so multiple IDE windows do not share the same session state.
+- Tool approval can be switched between normal approval prompts and a bypass mode that auto-accepts permissions.
+- The fork is tuned for Antigravity usage and local custom deployment rather than upstream distribution.
 
 ## Getting started
 
