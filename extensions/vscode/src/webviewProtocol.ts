@@ -40,7 +40,7 @@ export class VsCodeWebviewProtocol
   }
 
   _webview?: vscode.Webview;
-  _webviewListener?: vscode.Disposable;
+  _webviewListeners = new Map<vscode.Webview, vscode.Disposable>();
 
   get webview(): vscode.Webview | undefined {
     return this._webview;
@@ -48,7 +48,10 @@ export class VsCodeWebviewProtocol
 
   set webview(webView: vscode.Webview) {
     this._webview = webView;
-    this._webviewListener?.dispose();
+
+    if (this._webviewListeners.has(webView)) {
+      return;
+    }
 
     const handleMessage = async (msg: Message): Promise<void> => {
       if (!("messageType" in msg) || !("messageId" in msg)) {
@@ -56,7 +59,11 @@ export class VsCodeWebviewProtocol
       }
 
       const respond = (message: any) =>
-        this.send(msg.messageType, message, msg.messageId);
+        webView.postMessage({
+          messageType: msg.messageType,
+          data: message,
+          messageId: msg.messageId,
+        });
 
       const handlers =
         this.listeners.get(msg.messageType as keyof FromWebviewProtocol) || [];
@@ -149,7 +156,18 @@ export class VsCodeWebviewProtocol
       }
     };
 
-    this._webviewListener = this._webview.onDidReceiveMessage(handleMessage);
+    this._webviewListeners.set(
+      webView,
+      webView.onDidReceiveMessage(handleMessage),
+    );
+  }
+
+  disposeWebview(webView: vscode.Webview) {
+    this._webviewListeners.get(webView)?.dispose();
+    this._webviewListeners.delete(webView);
+    if (this._webview === webView) {
+      this._webview = undefined;
+    }
   }
 
   constructor() {}

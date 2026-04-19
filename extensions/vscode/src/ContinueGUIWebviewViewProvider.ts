@@ -11,8 +11,13 @@ export class ContinueGUIWebviewViewProvider
   implements vscode.WebviewViewProvider
 {
   public static readonly viewType = "continueYolo.continueGUIView";
+  public static readonly editorPanelViewType =
+    "continueYolo.continueEditorPanel";
+  private static readonly EDITOR_PANEL_OPEN_STATE_KEY =
+    "continueYolo.editorPanelOpen";
   public webviewProtocol: VsCodeWebviewProtocol;
   private _webviewPanel?: vscode.WebviewPanel;
+  private _webviewPanels = new Set<vscode.WebviewPanel>();
 
   public get isReady(): boolean {
     return !!this.webview;
@@ -79,22 +84,43 @@ export class ContinueGUIWebviewViewProvider
     this.webviewProtocol.webview = webview;
   }
 
-  public async openEditorTab(): Promise<vscode.WebviewPanel> {
-    if (this._webviewPanel) {
-      this._webviewPanel.reveal(vscode.ViewColumn.Active);
-      this.attachWebview(this._webviewPanel.webview);
-      return this._webviewPanel;
-    }
+  private updateEditorPanelOpenState() {
+    void this.extensionContext.globalState.update(
+      ContinueGUIWebviewViewProvider.EDITOR_PANEL_OPEN_STATE_KEY,
+      this._webviewPanels.size > 0,
+    );
+  }
 
-    const panel = vscode.window.createWebviewPanel(
-      ContinueGUIWebviewViewProvider.viewType,
-      "Continue",
-      vscode.ViewColumn.Active,
+  public shouldRestoreEditorPanel(): boolean {
+    return (
+      this.extensionContext.globalState.get<boolean>(
+        ContinueGUIWebviewViewProvider.EDITOR_PANEL_OPEN_STATE_KEY,
+      ) ?? false
+    );
+  }
+
+  public registerEditorPanelSerializer(): vscode.Disposable {
+    return vscode.window.registerWebviewPanelSerializer(
+      ContinueGUIWebviewViewProvider.editorPanelViewType,
       {
-        retainContextWhenHidden: true,
-        enableScripts: true,
+        deserializeWebviewPanel: async (panel) => {
+          this.initializeEditorPanel(panel, {
+            startMode: "restore",
+            preserveFocus: true,
+          });
+        },
       },
     );
+  }
+
+  private initializeEditorPanel(
+    panel: vscode.WebviewPanel,
+    options?: {
+      startMode?: "restore" | "new";
+      preserveFocus?: boolean;
+    },
+  ): vscode.WebviewPanel {
+    const { startMode = "restore" } = options ?? {};
 
     this._webviewPanel = panel;
     panel.iconPath = vscode.Uri.joinPath(
@@ -109,16 +135,64 @@ export class ContinueGUIWebviewViewProvider
       undefined,
       undefined,
       true,
+      startMode,
     );
+    this._webviewPanels.add(panel);
+    this.updateEditorPanelOpenState();
 
     panel.onDidDispose(() => {
+      this.webviewProtocol.disposeWebview(panel.webview);
+      this._webviewPanels.delete(panel);
       if (this._webviewPanel === panel) {
-        this._webviewPanel = undefined;
-        this._webview = undefined;
+        const remainingPanels = Array.from(this._webviewPanels);
+        const nextPanel = remainingPanels.at(-1);
+        this._webviewPanel = nextPanel;
+        if (nextPanel) {
+          this.attachWebview(nextPanel.webview);
+        } else {
+          this._webview = undefined;
+        }
       }
+      this.updateEditorPanelOpenState();
     });
 
+    if (options?.preserveFocus) {
+      panel.reveal(panel.viewColumn, true);
+    }
+
     return panel;
+  }
+
+  public async openEditorTab(options?: {
+    forceNew?: boolean;
+    startMode?: "restore" | "new";
+    preserveFocus?: boolean;
+  }): Promise<vscode.WebviewPanel> {
+    const {
+      forceNew = false,
+      startMode = "restore",
+      preserveFocus = false,
+    } = options ?? {};
+
+    if (!forceNew && this._webviewPanel) {
+      this._webviewPanel.reveal(vscode.ViewColumn.Active);
+      this.attachWebview(this._webviewPanel.webview);
+      return this._webviewPanel;
+    }
+
+    const panel = vscode.window.createWebviewPanel(
+      ContinueGUIWebviewViewProvider.editorPanelViewType,
+      "Continue",
+      {
+        viewColumn: vscode.ViewColumn.Active,
+        preserveFocus,
+      },
+      {
+        retainContextWhenHidden: true,
+        enableScripts: true,
+      },
+    );
+    return this.initializeEditorPanel(panel, { startMode, preserveFocus });
   }
 
   public closeEditorTab(): void {
@@ -131,6 +205,7 @@ export class ContinueGUIWebviewViewProvider
     page: string | undefined = undefined,
     edits: FileEdit[] | undefined = undefined,
     isFullScreen = false,
+    startMode: "restore" | "new" = "restore",
   ): string {
     const extensionUri = getExtensionUri();
     let scriptUri: string;
@@ -230,6 +305,8 @@ export class ContinueGUIWebviewViewProvider
           ) || [],
         )}</script>
         <script>window.isFullScreen = ${isFullScreen}</script>
+        <script>window.continueSessionStartMode = "${startMode}"</script>
+        <script>window.isEditorPanel = ${isFullScreen}</script>
 
         ${
           edits

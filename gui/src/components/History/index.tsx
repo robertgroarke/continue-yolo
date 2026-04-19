@@ -223,9 +223,11 @@ export function History() {
         >
           Chat history is saved to{" "}
           <span className="italic">
-            {platform === "windows"
-              ? "%USERPROFILE%/.continue"
-              : "~/.continue/sessions"}
+            {(window as any).isEditorPanel
+              ? "this workspace's Antigravity storage folder"
+              : platform === "windows"
+                ? "%USERPROFILE%/.continue"
+                : "~/.continue/sessions"}
           </span>
         </span>
       </div>

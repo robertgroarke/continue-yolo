@@ -1,5 +1,6 @@
 import {
   AtSymbolIcon,
+  ChevronDownIcon,
   LightBulbIcon as LightBulbIconOutline,
   PhotoIcon,
 } from "@heroicons/react/24/outline";
@@ -23,6 +24,7 @@ import { ToolTip } from "../gui/Tooltip";
 import ModelSelect from "../modelSelection/ModelSelect";
 import { ModeSelect } from "../ModeSelect";
 import { Button } from "../ui";
+import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "../ui";
 import { useFontSize } from "../ui/font";
 import ContextStatus from "./ContextStatus";
 import HoverItem from "./InputToolbar/HoverItem";
@@ -71,7 +73,8 @@ function InputToolbar(props: InputToolbarProps) {
     );
 
   const supportsReasoning = modelSupportsReasoning(defaultModel);
-  const { isBypassPermissions, togglePermissionMode } = usePermissionMode();
+  const { isBypassPermissions, permissionMode, setPermissionMode } =
+    usePermissionMode();
 
   const smallFont = useFontSize(-2);
   const tinyFont = useFontSize(-3);
@@ -178,25 +181,45 @@ function InputToolbar(props: InputToolbarProps) {
         >
           {!isInEdit && <ContextStatus />}
           {!isInEdit && props.isMainInput && (
-            <ToolTip
-              place="top"
-              content={
-                isBypassPermissions
-                  ? "Automatically accept all tool permissions in Continue YOLO"
-                  : "Require manual approval for tool permissions in Continue YOLO"
-              }
-            >
-              <Button
-                variant={isBypassPermissions ? "outline" : "secondary"}
-                size="sm"
-                onClick={togglePermissionMode}
-                type="button"
+            <Listbox value={permissionMode} onChange={setPermissionMode}>
+              <ToolTip
+                place="top"
+                content={
+                  isBypassPermissions
+                    ? "Automatically accept all tool permissions in Continue YOLO"
+                    : "Require manual approval for tool permissions in Continue YOLO"
+                }
               >
-                {isBypassPermissions
-                  ? "Bypass permissions"
-                  : "Ask for permission"}
-              </Button>
-            </ToolTip>
+                <div className="min-w-[170px]">
+                  <ListboxButton className="justify-between gap-2 px-2 py-1">
+                    <span>
+                      {isBypassPermissions
+                        ? "Bypass permissions"
+                        : "Ask for permission"}
+                    </span>
+                    <ChevronDownIcon className="h-3 w-3 flex-shrink-0" />
+                  </ListboxButton>
+                </div>
+              </ToolTip>
+              <ListboxOptions className="min-w-[220px]">
+                <ListboxOption value="ask">
+                  <div className="flex flex-col">
+                    <span>Ask for permission</span>
+                    <span className="text-description-muted text-[10px]">
+                      Require manual approval before tool execution
+                    </span>
+                  </div>
+                </ListboxOption>
+                <ListboxOption value="bypass">
+                  <div className="flex flex-col">
+                    <span>Bypass permissions</span>
+                    <span className="text-description-muted text-[10px]">
+                      Automatically accept all tool permissions
+                    </span>
+                  </div>
+                </ListboxOption>
+              </ListboxOptions>
+            </Listbox>
           )}
           {!props.toolbarOptions?.hideUseCodebase && !isInEdit && (
             <div className="hidden transition-colors duration-200 hover:underline md:flex">

@@ -16,6 +16,7 @@ import {
   addContextItemsAtIndex,
   newSession,
   setHasReasoningEnabled,
+  setIsRestoringSession,
   setIsSessionMetadataLoading,
   setMode,
 } from "../redux/slices/sessionSlice";
@@ -24,7 +25,11 @@ import { setTTSActive } from "../redux/slices/uiSlice";
 import { modelSupportsReasoning } from "core/llm/autodetect";
 import { cancelStream } from "../redux/thunks/cancelStream";
 import { handleApplyStateUpdate } from "../redux/thunks/handleApplyStateUpdate";
-import { loadSession, refreshSessionMetadata } from "../redux/thunks/session";
+import {
+  loadLastSession,
+  loadSession,
+  refreshSessionMetadata,
+} from "../redux/thunks/session";
 import { updateFileSymbolsFromHistory } from "../redux/thunks/updateFileSymbols";
 import {
   setDocumentStylesFromLocalStorage,
@@ -50,8 +55,6 @@ function ParallelListeners() {
 
   // Load symbols for chat on any session change
   const sessionId = useAppSelector((state) => state.session.id);
-  const lastSessionId = useAppSelector((store) => store.session.lastSessionId);
-  const [initialSessionId] = useState(sessionId || lastSessionId);
 
   const handleConfigUpdate = useCallback(
     async (isInitial: boolean, result: FromCoreProtocol["configUpdate"][0]) => {
@@ -121,13 +124,19 @@ function ParallelListeners() {
         await handleConfigUpdate(true, result.content);
       }
       dispatch(setConfigLoading(false));
-      if (initialSessionId) {
-        await dispatch(
-          loadSession({
-            sessionId: initialSessionId,
-            saveCurrentSession: false,
-          }),
-        );
+      const startMode =
+        (window as any).continueSessionStartMode === "new" ? "new" : "restore";
+
+      if (startMode === "new") {
+        dispatch(setIsRestoringSession(false));
+        dispatch(newSession());
+      } else {
+        dispatch(setIsRestoringSession(true));
+        try {
+          await dispatch(loadLastSession());
+        } finally {
+          dispatch(setIsRestoringSession(false));
+        }
       }
     }
     void initialLoadConfig();
@@ -146,7 +155,7 @@ function ParallelListeners() {
     }, 2_000);
 
     return () => clearInterval(interval);
-  }, [hasDoneInitialConfigLoad, ideMessenger, initialSessionId]);
+  }, [hasDoneInitialConfigLoad, ideMessenger]);
 
   useWebviewListener(
     "configUpdate",

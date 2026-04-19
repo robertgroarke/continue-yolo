@@ -203,6 +203,7 @@ export type ChatHistoryItemWithMessageId = ChatHistoryItem & {
 
 type SessionState = {
   lastSessionId?: string;
+  isRestoringSession: boolean;
   isSessionMetadataLoading: boolean;
   allSessionMetadata: (BaseSessionMetadata | RemoteSessionMetadata)[];
   history: ChatHistoryItemWithMessageId[];
@@ -226,7 +227,19 @@ type SessionState = {
   compactionLoading: Record<number, boolean>; // Track compaction loading by message index
 };
 
+function getInitialIsRestoringSession(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return (
+    (window as any).isEditorPanel === true &&
+    (window as any).continueSessionStartMode === "restore"
+  );
+}
+
 export const INITIAL_SESSION_STATE: SessionState = {
+  isRestoringSession: getInitialIsRestoringSession(),
   isSessionMetadataLoading: false,
   allSessionMetadata: [],
   history: [],
@@ -719,6 +732,9 @@ export const sessionSlice = createSlice({
     ) => {
       state.isSessionMetadataLoading = payload;
     },
+    setIsRestoringSession: (state, { payload }: PayloadAction<boolean>) => {
+      state.isRestoringSession = payload;
+    },
     setAllSessionMetadata: (
       state,
       {
@@ -1082,6 +1098,7 @@ export const {
   setProcessedToolCallArgs,
   setMode,
   setIsSessionMetadataLoading,
+  setIsRestoringSession,
   setAllSessionMetadata,
   addSessionMetadata,
   updateSessionMetadata,

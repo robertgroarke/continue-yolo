@@ -63,7 +63,7 @@ function captureCommandTelemetry(
 }
 
 async function focusGUI(sidebar: ContinueGUIWebviewViewProvider) {
-  await sidebar.openEditorTab();
+  await sidebar.openEditorTab({ startMode: "restore" });
 }
 
 function hideGUI(sidebar: ContinueGUIWebviewViewProvider) {
@@ -412,8 +412,10 @@ const getCommandsMap: (
     },
     "continueYolo.editor.newSession": async () => {
       captureCommandTelemetry("editorNewSession");
-      await focusGUI(sidebar);
-      sidebar.webviewProtocol?.request("newSession", undefined);
+      await sidebar.openEditorTab({
+        forceNew: true,
+        startMode: "new",
+      });
     },
 
     "continueYolo.shareSession": async (sessionId: string | undefined) => {
@@ -811,7 +813,7 @@ const getCommandsMap: (
         undefined,
       );
       captureCommandTelemetry("openInNewWindow");
-      await sidebar.openEditorTab();
+      await sidebar.openEditorTab({ forceNew: true, startMode: "restore" });
       if (sessionId) {
         await vscode.commands.executeCommand(
           "continueYolo.focusContinueSessionId",

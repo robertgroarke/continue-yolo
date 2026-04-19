@@ -22,7 +22,9 @@ export function getNonce() {
 }
 
 export function getExtensionUri(): vscode.Uri {
-  return (vscode.extensions.getExtension("Continue.continue-yolo") ??
+  return (vscode.extensions.getExtension("robertgroarke.continue-yolo") ??
+    vscode.extensions.getExtension("Continue.continue-yolo") ??
+    vscode.extensions.getExtension("robertgroarke.continue") ??
     vscode.extensions.getExtension("Continue.continue"))!.extensionUri;
 }
 

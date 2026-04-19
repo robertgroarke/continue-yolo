@@ -184,27 +184,67 @@ export const selectChatModelForProfile = createAsyncThunk<
 export const loadLastSession = createAsyncThunk<void, void, ThunkApiType>(
   "session/loadLast",
   async (_, { extra, dispatch, getState }) => {
-    let lastSessionId = getState().session.lastSessionId;
-
-    // const lastSessionResult = await extra.ideMessenger.request("history/list", {
-    //   limit: 1,
-    // });
-    // if (lastSessionResult.status === "success") {
-    //   lastSessionId = lastSessionResult.content.at(0)?.sessionId;
-    // }
+    const persistedSession = getState().session;
+    let lastSessionId =
+      persistedSession.title !== NEW_SESSION_TITLE
+        ? persistedSession.id
+        : persistedSession.lastSessionId;
 
     if (!lastSessionId) {
-      dispatch(newSession());
-      return;
+      const lastSessionResult = await extra.ideMessenger.request(
+        "history/list",
+        {
+          limit: 1,
+        },
+      );
+      if (lastSessionResult.status === "success") {
+        lastSessionId = lastSessionResult.content.at(0)?.sessionId;
+      }
+      if (!lastSessionId) {
+        dispatch(newSession());
+        return;
+      }
     }
 
     let session: Session;
     try {
       session = await getSession(extra.ideMessenger, lastSessionId);
     } catch {
-      // retry again after 1 sec
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      session = await getSession(extra.ideMessenger, lastSessionId);
+      const fallbackSessionId =
+        lastSessionId !== persistedSession.lastSessionId
+          ? persistedSession.lastSessionId
+          : undefined;
+
+      if (fallbackSessionId) {
+        try {
+          session = await getSession(extra.ideMessenger, fallbackSessionId);
+          dispatch(newSession(session));
+          if (session.chatModelTitle) {
+            dispatch(selectChatModelForProfile(session.chatModelTitle));
+          }
+          return;
+        } catch {
+          // Continue to history/list fallback below.
+        }
+      }
+
+      const lastSessionResult = await extra.ideMessenger.request(
+        "history/list",
+        {
+          limit: 1,
+        },
+      );
+      if (lastSessionResult.status !== "success") {
+        throw new Error(lastSessionResult.error);
+      }
+
+      const latestSessionId = lastSessionResult.content.at(0)?.sessionId;
+      if (!latestSessionId) {
+        dispatch(newSession());
+        return;
+      }
+
+      session = await getSession(extra.ideMessenger, latestSessionId);
     }
     dispatch(newSession(session));
     if (session.chatModelTitle) {

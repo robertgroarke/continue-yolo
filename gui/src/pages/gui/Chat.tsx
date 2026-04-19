@@ -120,6 +120,9 @@ export function Chat() {
   const stepsDivRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const history = useAppSelector((state) => state.session.history);
+  const isRestoringSession = useAppSelector(
+    (state) => state.session.isRestoringSession,
+  );
   const showChatScrollbar = useAppSelector(
     (state) => state.config.config.ui?.showChatScrollbar,
   );
@@ -138,6 +141,8 @@ export function Chat() {
   const jetbrains = useMemo(() => {
     return isJetBrains();
   }, []);
+  const showEditorSessionTabs =
+    showSessionTabs && !isInEdit && !(window as any).isEditorPanel;
 
   useAutoScroll(stepsDivRef, history);
 
@@ -439,7 +444,7 @@ export function Chat() {
 
   return (
     <>
-      {!!showSessionTabs && !isInEdit && <TabBar ref={tabsRef} />}
+      {!!showEditorSessionTabs && <TabBar ref={tabsRef} />}
       {widget}
 
       <StepsDiv
@@ -447,6 +452,11 @@ export function Chat() {
         className={`min-h-0 overflow-y-auto pt-[8px] ${showScrollbar ? "thin-scrollbar" : "no-scrollbar"} ${history.length > 0 ? "flex-1" : ""}`}
       >
         {highlights}
+        {isRestoringSession && history.length === 0 && (
+          <div className="flex min-h-[40vh] items-center justify-center text-sm text-zinc-400">
+            Loading session...
+          </div>
+        )}
         {history
           .filter((item) => item.message.role !== "system")
           .map((item, index: number) => (
@@ -491,17 +501,20 @@ export function Chat() {
         >
           <div className="flex flex-row items-center justify-between pb-1 pl-0.5 pr-2">
             <div className="xs:inline hidden">
-              {history.length === 0 && lastSessionId && !isInEdit && (
-                <NewSessionButton
-                  onClick={async () => {
-                    await dispatch(loadLastSession());
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeftIcon className="h-3 w-3" />
-                  <span className="text-xs">Last Session</span>
-                </NewSessionButton>
-              )}
+              {history.length === 0 &&
+                lastSessionId &&
+                !isInEdit &&
+                !isRestoringSession && (
+                  <NewSessionButton
+                    onClick={async () => {
+                      await dispatch(loadLastSession());
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <ArrowLeftIcon className="h-3 w-3" />
+                    <span className="text-xs">Last Session</span>
+                  </NewSessionButton>
+                )}
             </div>
           </div>
           <FatalErrorIndicator />
@@ -509,7 +522,8 @@ export function Chat() {
           {mode === "background" ? (
             <BackgroundModeView isCreatingAgent={isCreatingAgent} />
           ) : (
-            history.length === 0 && (
+            history.length === 0 &&
+            !isRestoringSession && (
               <EmptyChatBody showOnboardingCard={onboardingCard.show} />
             )
           )}

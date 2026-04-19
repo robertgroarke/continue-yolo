@@ -43,6 +43,7 @@ export async function activateExtension(context: vscode.ExtensionContext) {
   setupInlineTips(context);
 
   const vscodeExtension = new VsCodeExtension(context);
+  context.subscriptions.push(vscodeExtension.registerEditorPanelSerializer());
 
   // Load Continue configuration
   if (!context.globalState.get("hasBeenInstalled")) {

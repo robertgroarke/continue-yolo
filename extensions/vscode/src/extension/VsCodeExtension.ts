@@ -103,6 +103,15 @@ export class VsCodeExtension {
 
   private ARBITRARY_TYPING_DELAY = 2000;
 
+  public async restoreEditorPanelIfNeeded(): Promise<void> {
+    if (this.sidebar.shouldRestoreEditorPanel()) {
+      await this.sidebar.openEditorTab({
+        startMode: "restore",
+        preserveFocus: true,
+      });
+    }
+  }
+
   private initializeWorkspaceSessionStorage(context: vscode.ExtensionContext) {
     const workspaceStorageUri =
       context.storageUri ??
@@ -769,5 +778,9 @@ export class VsCodeExtension {
 
   public deactivateNextEdit() {
     this.completionProvider.deactivateNextEdit();
+  }
+
+  public registerEditorPanelSerializer(): vscode.Disposable {
+    return this.sidebar.registerEditorPanelSerializer();
   }
 }

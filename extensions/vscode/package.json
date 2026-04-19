@@ -52,7 +52,8 @@
   ],
   "activationEvents": [
     "onUri",
-    "onStartupFinished"
+    "onStartupFinished",
+    "onWebviewPanel:continueYolo.continueEditorPanel"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -596,16 +597,6 @@
         {
           "command": "continueYolo.editor.newSession",
           "group": "navigation"
-        },
-        {
-          "command": "continueYolo.newSession",
-          "group": "navigation@1",
-          "when": "activeWebviewPanelId == continueYolo.continueGUIView"
-        },
-        {
-          "command": "continueYolo.viewHistory",
-          "group": "navigation@2",
-          "when": "activeWebviewPanelId == continueYolo.continueGUIView"
         }
       ],
       "terminal/context": [
