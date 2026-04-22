@@ -52,6 +52,28 @@ export type ToIdeFromWebviewProtocol = ToIdeFromWebviewOrCoreProtocol & {
   "edit/addCurrentSelection": [undefined, void];
   "edit/clearDecorations": [undefined, void];
   "session/share": [{ sessionId: string }, void];
+  getDefaultPermissionMode: [undefined, "ask" | "bypass"];
+  setDefaultPermissionMode: [{ mode: "ask" | "bypass" }, void];
+  activeSessionUpdate: [
+    { sessionId: string | undefined; title?: string | undefined },
+    void,
+  ];
+  panelSessionUpdate: [
+    { panelInstanceId: string; sessionId: string | undefined },
+    void,
+  ];
+  restoreTimingEvent: [
+    {
+      event: string;
+      surface?: "panel" | "sidebar";
+      sessionId?: string;
+      title?: string;
+      sinceBootstrapMs?: number;
+      absoluteTimestampMs?: number;
+      metadata?: Record<string, string | number | boolean | undefined>;
+    },
+    void,
+  ];
   createBackgroundAgent: [
     {
       content: MessageContent;

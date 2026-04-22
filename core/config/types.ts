@@ -241,6 +241,7 @@ declare global {
     title: string;
     workspaceDirectory: string;
     history: ChatHistoryItem[];
+    permissionMode?: "ask" | "bypass";
   }
   
   export interface SessionMetadata {
@@ -660,6 +661,7 @@ declare global {
     remoteConfigSyncPeriod: number;
     userToken: string;
     pauseCodebaseIndexOnStart: boolean;
+    defaultPermissionMode?: "ask" | "bypass";
   }
   
   export interface IDE {

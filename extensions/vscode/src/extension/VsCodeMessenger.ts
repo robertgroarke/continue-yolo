@@ -1,5 +1,6 @@
 import { ConfigHandler } from "core/config/ConfigHandler";
 import { DataLogger } from "core/data/log";
+import { EXTENSION_NAME } from "core/control-plane/env";
 import { EDIT_MODE_STREAM_ID } from "core/edit/constants";
 import {
   FromCoreProtocol,
@@ -267,6 +268,42 @@ export class VsCodeMessenger {
         "continueYolo.shareSession",
         msg.data.sessionId,
       );
+    });
+
+    this.onWebview("getDefaultPermissionMode", async () => {
+      return (
+        vscode.workspace
+          .getConfiguration(EXTENSION_NAME)
+          .get<"ask" | "bypass">("defaultPermissionMode", "bypass") ?? "bypass"
+      );
+    });
+
+    this.onWebview("setDefaultPermissionMode", async ({ data }) => {
+      await vscode.workspace
+        .getConfiguration(EXTENSION_NAME)
+        .update(
+          "defaultPermissionMode",
+          data.mode,
+          vscode.ConfigurationTarget.Global,
+        );
+    });
+
+    this.onWebview("activeSessionUpdate", async ({ data }) => {
+      this.vsCodeExtension.updateActiveSession({
+        sessionId: data.sessionId,
+        title: data.title,
+      });
+    });
+
+    this.onWebview("panelSessionUpdate", async (msg) => {
+      this.vsCodeExtension.updatePanelSession(
+        msg.data.panelInstanceId,
+        msg.data.sessionId,
+      );
+    });
+
+    this.onWebview("restoreTimingEvent", async ({ data }) => {
+      this.vsCodeExtension.logRestoreTiming(data);
     });
 
     this.onWebview("createBackgroundAgent", async (msg) => {

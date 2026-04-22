@@ -90,6 +90,7 @@ export class VsCodeExtension {
   private ideUtils: VsCodeIdeUtils;
   private consoleView: ContinueConsoleWebviewViewProvider;
   private sidebar: ContinueGUIWebviewViewProvider;
+  private restoreOutputChannel: vscode.OutputChannel;
   private windowId: string;
   private editDecorationManager: EditDecorationManager;
   private verticalDiffManager: VerticalDiffManager;
@@ -103,13 +104,53 @@ export class VsCodeExtension {
 
   private ARBITRARY_TYPING_DELAY = 2000;
 
-  public async restoreEditorPanelIfNeeded(): Promise<void> {
-    if (this.sidebar.shouldRestoreEditorPanel()) {
-      await this.sidebar.openEditorTab({
-        startMode: "restore",
-        preserveFocus: true,
-      });
+  private createOpenStatusBarItem(): vscode.StatusBarItem {
+    const item = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Right,
+      200,
+    );
+    item.name = "Continue YOLO";
+    item.text = "$(sparkle) Continue YOLO";
+    item.tooltip = "Open Continue YOLO";
+    item.command = "continueYolo.openLast";
+    item.show();
+    return item;
+  }
+
+  public logRestoreTiming(event: {
+    event: string;
+    surface?: "panel" | "sidebar";
+    sessionId?: string;
+    title?: string;
+    sinceBootstrapMs?: number;
+    absoluteTimestampMs?: number;
+    metadata?: Record<string, string | number | boolean | undefined>;
+  }): void {
+    const timestamp = new Date().toISOString();
+    const parts = [timestamp, event.surface ?? "unknown", event.event];
+
+    if (event.sessionId) {
+      parts.push(`session=${event.sessionId}`);
     }
+    if (event.title) {
+      parts.push(`title=${JSON.stringify(event.title)}`);
+    }
+    if (typeof event.sinceBootstrapMs === "number") {
+      parts.push(`sinceBootstrapMs=${event.sinceBootstrapMs}`);
+    }
+    if (typeof event.absoluteTimestampMs === "number") {
+      parts.push(`absoluteTimestampMs=${event.absoluteTimestampMs}`);
+    }
+    if (event.metadata) {
+      const metadataEntries = Object.entries(event.metadata)
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => `${key}=${JSON.stringify(value)}`);
+      if (metadataEntries.length > 0) {
+        parts.push(metadataEntries.join(" "));
+      }
+    }
+
+    this.restoreOutputChannel.appendLine(parts.join(" | "));
   }
 
   private initializeWorkspaceSessionStorage(context: vscode.ExtensionContext) {
@@ -121,10 +162,9 @@ export class VsCodeExtension {
       );
 
     fs.mkdirSync(workspaceStorageUri.fsPath, { recursive: true });
-    process.env.CONTINUE_SESSION_DIR = path.join(
-      workspaceStorageUri.fsPath,
-      "sessions",
-    );
+    const sessionDir = path.join(workspaceStorageUri.fsPath, "sessions");
+    process.env.CONTINUE_YOLO_SESSION_DIR = sessionDir;
+    process.env.CONTINUE_SESSION_DIR = sessionDir;
   }
 
   private async migrateLegacySettings(context: vscode.ExtensionContext) {
@@ -283,6 +323,10 @@ export class VsCodeExtension {
     context.subscriptions.push(this.workOsAuthProvider);
 
     this.editDecorationManager = new EditDecorationManager(context);
+    this.restoreOutputChannel = vscode.window.createOutputChannel(
+      "Continue YOLO Restore",
+    );
+    context.subscriptions.push(this.restoreOutputChannel);
 
     let resolveWebviewProtocol: any = undefined;
     this.webviewProtocolPromise = new Promise<VsCodeWebviewProtocol>(
@@ -296,6 +340,7 @@ export class VsCodeExtension {
     this.windowId = uuidv4();
     this.initializeWorkspaceSessionStorage(context);
     void this.migrateLegacySettings(context);
+    context.subscriptions.push(this.createOpenStatusBarItem());
 
     // Check if model supports next edit to determine if we should use full file diff.
     const getUsingFullFileDiff = async () => {
@@ -362,6 +407,7 @@ export class VsCodeExtension {
     this.sidebar = new ContinueGUIWebviewViewProvider(
       this.windowId,
       this.extensionContext,
+      this.logRestoreTiming.bind(this),
     );
 
     resolveWebviewProtocol(this.sidebar.webviewProtocol);
@@ -502,6 +548,14 @@ export class VsCodeExtension {
       this.windowId,
       this.extensionContext,
       this.core.llmLogger,
+    );
+
+    context.subscriptions.push(
+      vscode.window.registerWebviewViewProvider(
+        ContinueGUIWebviewViewProvider.viewType,
+        this.sidebar,
+        { webviewOptions: { retainContextWhenHidden: true } },
+      ),
     );
 
     context.subscriptions.push(
@@ -782,5 +836,36 @@ export class VsCodeExtension {
 
   public registerEditorPanelSerializer(): vscode.Disposable {
     return this.sidebar.registerEditorPanelSerializer();
+  }
+
+  public updatePanelSession(
+    panelInstanceId: string,
+    sessionId: string | undefined,
+  ): void {
+    this.sidebar.updatePanelSession(panelInstanceId, sessionId);
+  }
+
+  public updateActiveSession(summary: {
+    sessionId: string | undefined;
+    title?: string;
+  }): void {
+    this.sidebar.updateActiveSession(summary);
+  }
+
+  public revealSessionPanel(
+    sessionId: string,
+    options?: { excludeActive?: boolean; preserveFocus?: boolean },
+  ): boolean {
+    return this.sidebar.revealSessionPanel(sessionId, options);
+  }
+
+  public getLastActiveSessionId(): string | undefined {
+    return this.sidebar.getLastActiveSessionId();
+  }
+
+  public getLastActiveSessionSummary():
+    | { sessionId: string; title?: string }
+    | undefined {
+    return this.sidebar.getLastActiveSessionSummary();
   }
 }

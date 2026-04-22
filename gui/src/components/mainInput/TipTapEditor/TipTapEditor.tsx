@@ -28,6 +28,7 @@ export interface TipTapEditorProps {
   availableContextProviders: ContextProviderDescription[];
   availableSlashCommands: ComboBoxItem[];
   isMainInput: boolean;
+  editable?: boolean;
   onEnter: (
     editorState: JSONContent,
     modifiers: InputModifiers,
@@ -127,9 +128,14 @@ function TipTapEditorInner(props: TipTapEditorProps) {
     }
   }, [props.isMainInput, isStreaming, editor]);
 
-  // Recovery mechanism: ensure historical inputs regain editability when streaming ends
+  // Recovery mechanism: ensure editable historical inputs regain editability when streaming ends
   useEffect(() => {
-    if (!isStreaming && !props.isMainInput && editor) {
+    if (
+      !isStreaming &&
+      !props.isMainInput &&
+      props.editable !== false &&
+      editor
+    ) {
       // Small delay to ensure editor state has settled after streaming transition
       const timeoutId = setTimeout(() => {
         if (editor && !editor.isDestroyed) {
@@ -217,7 +223,9 @@ function TipTapEditorInner(props: TipTapEditorProps) {
           : "cursor-text"
       }
       onClick={() => {
-        editor?.commands.focus();
+        if (props.editable !== false) {
+          editor?.commands.focus();
+        }
       }}
       onDragOver={(event) => {
         event.preventDefault();

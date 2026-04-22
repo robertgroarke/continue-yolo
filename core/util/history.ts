@@ -3,7 +3,6 @@ import * as fs from "fs";
 import { BaseSessionMetadata, Session } from "../index.js";
 import { ListHistoryOptions } from "../protocol/core.js";
 
-import { NEW_SESSION_TITLE } from "./constants.js";
 import {
   getSessionFilePath,
   getSessionsFolderPath,
@@ -89,22 +88,17 @@ export class HistoryManager {
   }
 
   load(sessionId: string): Session {
+    const sessionFile = getSessionFilePath(sessionId);
+    if (!fs.existsSync(sessionFile)) {
+      throw new Error(`Session file ${sessionFile} does not exist`);
+    }
+
     try {
-      const sessionFile = getSessionFilePath(sessionId);
-      if (!fs.existsSync(sessionFile)) {
-        throw new Error(`Session file ${sessionFile} does not exist`);
-      }
       const session: Session = JSON.parse(fs.readFileSync(sessionFile, "utf8"));
       session.sessionId = sessionId;
       return session;
     } catch (e) {
-      console.log(`Error loading session: ${e}`);
-      return {
-        history: [],
-        title: NEW_SESSION_TITLE,
-        workspaceDirectory: "",
-        sessionId: sessionId,
-      };
+      throw new Error(`Failed to load session ${sessionId}: ${e}`);
     }
   }
 
@@ -118,6 +112,9 @@ export class HistoryManager {
       workspaceDirectory: session.workspaceDirectory,
       history: session.history,
     };
+    if (session.permissionMode !== undefined) {
+      orderedSession.permissionMode = session.permissionMode;
+    }
     if (session.mode) {
       orderedSession.mode = session.mode;
     }

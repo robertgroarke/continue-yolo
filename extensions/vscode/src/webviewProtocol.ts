@@ -96,8 +96,12 @@ export class VsCodeWebviewProtocol
           if (await handleLLMError(e)) {
             // Respond without an error, so the UI doesn't show the error component
             respond({ done: true, status: "error" });
+            return;
           }
-          let message = e.message;
+          let message =
+            typeof e?.message === "string" && e.message.length > 0
+              ? e.message
+              : String(e ?? "Unknown error");
           respond({ done: true, error: message, status: "error" });
 
           const stringified = JSON.stringify({ msg }, null, 2);
@@ -122,7 +126,10 @@ export class VsCodeWebviewProtocol
             }
           }
 
-          if (message.includes("https://proxy-server")) {
+          if (
+            typeof message === "string" &&
+            message.includes("https://proxy-server")
+          ) {
             message = message.split("\n").filter((l: string) => l !== "")[1];
             try {
               message = JSON.parse(message).message;

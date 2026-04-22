@@ -4,6 +4,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
+import { unwrapResult } from "@reduxjs/toolkit";
 import { BaseSessionMetadata } from "core";
 import type { RemoteSessionMetadata } from "core/control-plane/client";
 import { getUriPathBasename } from "core/util/uri";
@@ -12,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { Input } from "..";
 import { IdeMessengerContext } from "../../context/IdeMessenger";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
+import { setIsRestoringSession } from "../../redux/slices/sessionSlice";
 import { exitEdit } from "../../redux/thunks/edit";
 import {
   deleteSession,
@@ -43,6 +45,9 @@ export function HistoryTableRow({
     sessionMetadata.title,
   );
   const currentSessionId = useAppSelector((state) => state.session.id);
+  const currentHistoryLength = useAppSelector(
+    (state) => state.session.history.length,
+  );
 
   useEffect(() => {
     setSessionTitleEditValue(sessionMetadata.title);
@@ -98,28 +103,55 @@ export function HistoryTableRow({
         // Handle remote sessions - load remote session data
         if (isRemote) {
           const remoteSession = sessionMetadata as RemoteSessionMetadata;
-          await dispatch(exitEdit({}));
-          await dispatch(
-            loadRemoteSession({
-              remoteId: remoteSession.remoteId,
-              saveCurrentSession: true,
-            }),
-          );
-          navigate("/");
+          dispatch(setIsRestoringSession(true));
+          try {
+            await dispatch(exitEdit({}));
+            await dispatch(
+              loadRemoteSession({
+                remoteId: remoteSession.remoteId,
+                saveCurrentSession: true,
+              }),
+            );
+            navigate("/");
+          } finally {
+            dispatch(setIsRestoringSession(false));
+          }
           return;
         }
 
         // Handle local sessions - load and navigate as before
-        await dispatch(exitEdit({}));
-        if (sessionMetadata.sessionId !== currentSessionId) {
-          await dispatch(
+        dispatch(setIsRestoringSession(true));
+        try {
+          await dispatch(exitEdit({}));
+          const result = await dispatch(
             loadSession({
               sessionId: sessionMetadata.sessionId,
-              saveCurrentSession: true,
+              saveCurrentSession:
+                sessionMetadata.sessionId !== currentSessionId &&
+                currentHistoryLength > 0,
+              expectedMessageCount: sessionMetadata.messageCount,
             }),
           );
+          const session = unwrapResult(result);
+          if (
+            (sessionMetadata.messageCount ?? 0) > 0 &&
+            session.history.length === 0
+          ) {
+            throw new Error(
+              `Session ${sessionMetadata.sessionId} loaded without any chat history`,
+            );
+          }
+
+          navigate("/");
+        } catch (error) {
+          console.error("Failed to load session from history row", error);
+          await ideMessenger.ide.showToast(
+            "error",
+            `Failed to load session: ${sessionMetadata.title}`,
+          );
+        } finally {
+          dispatch(setIsRestoringSession(false));
         }
-        navigate("/");
       }}
     >
       <td className="flex-1 cursor-pointer space-y-1">

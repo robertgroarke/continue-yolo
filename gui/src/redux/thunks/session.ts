@@ -4,11 +4,13 @@ import { RemoteSessionMetadata } from "core/control-plane/client";
 import { NEW_SESSION_TITLE } from "core/util/constants";
 import { renderChatMessage } from "core/util/messageContent";
 import { IIdeMessenger } from "../../context/IdeMessenger";
+import { setWorkspaceSharedLocalStorage } from "../../util/localStorage";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import { selectSelectedProfile } from "../slices/profilesSlice";
 import {
   deleteSessionMetadata,
   newSession,
+  sanitizeSessionHistory,
   setAllSessionMetadata,
   setIsSessionMetadataLoading,
   updateSessionMetadata,
@@ -58,6 +60,7 @@ export const refreshSessionMetadata = createAsyncThunk<
   if (result.status === "error") {
     throw new Error(result.error);
   }
+  setWorkspaceSharedLocalStorage("sessionMetadataCache", result.content);
   dispatch(setIsSessionMetadataLoading(false));
   dispatch(setAllSessionMetadata(result.content));
   return result.content;
@@ -97,15 +100,19 @@ export const updateSession = createAsyncThunk<void, Session, ThunkApiType>(
  this is only used for the custom focusContinueSessionId command at the moment
 */
 export const loadSession = createAsyncThunk<
-  void,
+  Session,
   {
     sessionId: string;
     saveCurrentSession: boolean;
+    expectedMessageCount?: number;
   },
   ThunkApiType
 >(
   "session/load",
-  async ({ sessionId, saveCurrentSession: save }, { extra, dispatch }) => {
+  async (
+    { sessionId, saveCurrentSession: save, expectedMessageCount = 0 },
+    { extra, dispatch },
+  ) => {
     if (save) {
       // save the session in the background
       void dispatch(
@@ -116,12 +123,18 @@ export const loadSession = createAsyncThunk<
       );
     }
     const session = await getSession(extra.ideMessenger, sessionId);
+    if (expectedMessageCount > 0 && session.history.length === 0) {
+      throw new Error(
+        `Session ${sessionId} loaded without history despite ${expectedMessageCount} saved messages`,
+      );
+    }
     dispatch(newSession(session));
 
     // Restore selected chat model from session, if present
     if (session.chatModelTitle) {
       void dispatch(selectChatModelForProfile(session.chatModelTitle));
     }
+    return session;
   },
 );
 
@@ -335,12 +348,44 @@ export const saveCurrentSession = createAsyncThunk<
       sessionId: session.id,
       title,
       workspaceDirectory: window.workspacePaths?.[0] || "",
-      history: session.history,
+      history: sanitizeSessionHistory(session.history),
       mode: session.mode,
       chatModelTitle: selectedChatModel?.title ?? null,
+      permissionMode: session.permissionMode,
     };
 
     const result = await dispatch(updateSession(updatedSession));
     unwrapResult(result);
   },
 );
+
+export const persistCurrentSessionSnapshot = createAsyncThunk<
+  void,
+  void,
+  ThunkApiType
+>("session/persistSnapshot", async (_, { extra, getState }) => {
+  const session = getState().session;
+  if (session.history.length === 0) {
+    return;
+  }
+
+  const selectedChatModel = selectSelectedChatModel(getState());
+
+  const updatedSession: Session = {
+    sessionId: session.id,
+    title: session.title || NEW_SESSION_TITLE,
+    workspaceDirectory: window.workspacePaths?.[0] || "",
+    history: sanitizeSessionHistory(session.history),
+    mode: session.mode,
+    chatModelTitle: selectedChatModel?.title ?? null,
+    permissionMode: session.permissionMode,
+  };
+
+  const result = await extra.ideMessenger.request(
+    "history/save",
+    updatedSession,
+  );
+  if (result.status === "error") {
+    throw new Error(result.error);
+  }
+});

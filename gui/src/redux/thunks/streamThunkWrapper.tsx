@@ -1,8 +1,8 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import posthog from "posthog-js";
-import StreamErrorDialog from "../../pages/gui/StreamError";
 import { analyzeError } from "../../util/errorAnalysis";
 import { selectSelectedChatModel } from "../slices/configSlice";
+import { setInlineErrorMessage } from "../slices/sessionSlice";
 import { setDialogMessage, setShowDialog } from "../slices/uiSlice";
 import { ThunkApiType } from "../store";
 import { cancelStream } from "./cancelStream";
@@ -27,14 +27,23 @@ export const streamThunkWrapper = createAsyncThunk<
   } catch (e) {
     const state = getState();
     const selectedModel = selectSelectedChatModel(state);
-    const { parsedError, statusCode, modelTitle, providerName } = analyzeError(
-      e,
-      selectedModel,
-    );
+    const {
+      parsedError,
+      statusCode,
+      modelTitle,
+      providerName,
+      customErrorMessage,
+    } = analyzeError(e, selectedModel);
 
     await dispatch(cancelStream());
-    dispatch(setDialogMessage(<StreamErrorDialog error={e} />));
-    dispatch(setShowDialog(true));
+    dispatch(setDialogMessage(undefined));
+    dispatch(setShowDialog(false));
+    dispatch(
+      setInlineErrorMessage({
+        type: "stream-error",
+        message: customErrorMessage || parsedError,
+      }),
+    );
 
     const errorData = {
       error_type: statusCode ? `HTTP ${statusCode}` : "Unknown",

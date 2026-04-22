@@ -201,6 +201,9 @@ export type ChatHistoryItemWithMessageId = ChatHistoryItem & {
   message: ChatMessage & { id: string };
 };
 
+export type PermissionMode = "ask" | "bypass";
+export const DEFAULT_PERMISSION_MODE: PermissionMode = "bypass";
+
 type SessionState = {
   lastSessionId?: string;
   isRestoringSession: boolean;
@@ -225,7 +228,86 @@ type SessionState = {
   contextPercentage?: number;
   inlineErrorMessage?: InlineErrorMessageType;
   compactionLoading: Record<number, boolean>; // Track compaction loading by message index
+  permissionMode: PermissionMode;
+  defaultPermissionMode: PermissionMode;
 };
+
+export function sanitizeSessionHistory(
+  history: ChatHistoryItemWithMessageId[],
+): ChatHistoryItemWithMessageId[] {
+  const sanitizedHistory = history.map((item) => {
+    const nextItem: ChatHistoryItemWithMessageId = {
+      ...item,
+      message: {
+        ...item.message,
+        id: item.message.id || uuidv4(),
+      },
+      isGatheringContext: false,
+    };
+
+    if (item.reasoning?.active) {
+      nextItem.reasoning = {
+        ...item.reasoning,
+        active: false,
+        endAt: item.reasoning.endAt ?? Date.now(),
+      };
+    }
+
+    if (item.toolCallStates?.length) {
+      nextItem.toolCallStates = item.toolCallStates.map((toolCallState) => ({
+        ...toolCallState,
+        status:
+          toolCallState.status === "calling" ||
+          toolCallState.status === "generating"
+            ? "canceled"
+            : toolCallState.status,
+      }));
+    }
+
+    return nextItem;
+  });
+
+  if (sanitizedHistory.length < 2) {
+    return sanitizedHistory;
+  }
+
+  const lastUserOrToolIdx = findLastIndex(
+    sanitizedHistory,
+    (item) => item.message.role === "tool" || item.message.role === "user",
+  );
+
+  if (lastUserOrToolIdx === -1) {
+    return sanitizedHistory;
+  }
+
+  let validAssistantMessageIdx = -1;
+  for (let i = sanitizedHistory.length - 1; i > lastUserOrToolIdx; i--) {
+    const message = sanitizedHistory[i];
+    const hasGeneratedMsg = message.toolCallStates?.some(
+      (toolCallState) => toolCallState.status !== "generating",
+    );
+    if (message.message.content || hasGeneratedMsg) {
+      validAssistantMessageIdx = i;
+      if (message.toolCallStates) {
+        message.toolCallStates.forEach((toolCallState) => {
+          if (
+            toolCallState.status === "generated" ||
+            toolCallState.status === "generating"
+          ) {
+            toolCallState.status = "canceled";
+          }
+        });
+      }
+      break;
+    }
+  }
+
+  if (validAssistantMessageIdx === -1) {
+    return sanitizedHistory.slice(0, lastUserOrToolIdx + 1);
+  }
+
+  return sanitizedHistory.slice(0, validAssistantMessageIdx + 1);
+}
 
 function getInitialIsRestoringSession(): boolean {
   if (typeof window === "undefined") {
@@ -257,6 +339,8 @@ export const INITIAL_SESSION_STATE: SessionState = {
   lastSessionId: undefined,
   newestToolbarPreviewForInput: {},
   compactionLoading: {},
+  permissionMode: DEFAULT_PERMISSION_MODE,
+  defaultPermissionMode: DEFAULT_PERMISSION_MODE,
 };
 
 export const sessionSlice = createSlice({
@@ -705,22 +789,32 @@ export const sessionSlice = createSlice({
 
       state.isStreaming = false;
       state.symbols = {};
+      state.mainEditorContentTrigger = undefined;
+      state.codeBlockApplyStates = {
+        states: [],
+        curIndex: 0,
+      };
+      state.newestToolbarPreviewForInput = {};
+      state.compactionLoading = {};
 
       state.inlineErrorMessage = undefined;
       state.isPruned = false;
       state.contextPercentage = undefined;
 
       if (payload) {
-        state.history = payload.history as any;
+        state.history = sanitizeSessionHistory(payload.history as any);
         state.title = payload.title;
         state.id = payload.sessionId;
         if (payload.mode) {
           state.mode = payload.mode;
         }
+        state.permissionMode =
+          payload.permissionMode ?? state.defaultPermissionMode;
       } else {
         state.history = [];
         state.title = NEW_SESSION_TITLE;
         state.id = uuidv4();
+        state.permissionMode = state.defaultPermissionMode;
       }
     },
     updateSessionTitle: (state, { payload }: PayloadAction<string>) => {
@@ -734,6 +828,15 @@ export const sessionSlice = createSlice({
     },
     setIsRestoringSession: (state, { payload }: PayloadAction<boolean>) => {
       state.isRestoringSession = payload;
+    },
+    setPermissionMode: (state, { payload }: PayloadAction<PermissionMode>) => {
+      state.permissionMode = payload;
+    },
+    setDefaultPermissionMode: (
+      state,
+      { payload }: PayloadAction<PermissionMode>,
+    ) => {
+      state.defaultPermissionMode = payload;
     },
     setAllSessionMetadata: (
       state,
@@ -1099,6 +1202,8 @@ export const {
   setMode,
   setIsSessionMetadataLoading,
   setIsRestoringSession,
+  setPermissionMode,
+  setDefaultPermissionMode,
   setAllSessionMetadata,
   addSessionMetadata,
   updateSessionMetadata,

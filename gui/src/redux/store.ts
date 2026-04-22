@@ -95,8 +95,14 @@ const migrations: MigrationManifest = {
 };
 
 function getWorkspacePersistKey(): string {
+  if ((window as any).isEditorPanel === true) {
+    const panelStorageKey =
+      (window as any).continuePanelStorageKey || window.windowId || "global";
+    return `root:panel:${panelStorageKey}`;
+  }
+
   const workspaceId = window.workspacePaths?.[0] || window.windowId || "global";
-  return `root:${workspaceId}`;
+  return `root:workspace:${workspaceId}`;
 }
 
 const persistConfig = {

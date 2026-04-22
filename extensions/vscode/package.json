@@ -147,6 +147,24 @@
           "type": "number",
           "default": 60,
           "description": "The period of time in minutes between automatic syncs."
+        },
+        "continueYolo.preferredLocation": {
+          "type": "string",
+          "enum": [
+            "panel",
+            "sidebar"
+          ],
+          "default": "panel",
+          "markdownDescription": "Choose whether Continue YOLO opens in an editor panel tab or the sidebar by default."
+        },
+        "continueYolo.defaultPermissionMode": {
+          "type": "string",
+          "enum": [
+            "ask",
+            "bypass"
+          ],
+          "default": "bypass",
+          "markdownDescription": "Choose the default tool permission mode for new Continue YOLO sessions. `bypass` auto-accepts tool permissions, while `ask` requires manual approval."
         }
       }
     },
@@ -239,14 +257,30 @@
       {
         "command": "continueYolo.newSession",
         "category": "Continue",
-        "title": "New Session",
+        "title": "Continue YOLO: New Session",
         "icon": "$(add)",
+        "group": "Continue"
+      },
+      {
+        "command": "continueYolo.openLast",
+        "category": "Continue",
+        "title": "Continue YOLO: Open Last Session",
+        "icon": {
+          "light": "media/sidebar-icon.png",
+          "dark": "media/sidebar-icon.png"
+        },
+        "group": "Continue"
+      },
+      {
+        "command": "continueYolo.sidebar.open",
+        "category": "Continue",
+        "title": "Continue YOLO: Open in Sidebar",
         "group": "Continue"
       },
       {
         "command": "continueYolo.editor.newSession",
         "category": "Continue",
-        "title": "Continue YOLO: New Editor Session",
+        "title": "Continue YOLO: New Editor Session in New Column",
         "icon": {
           "light": "media/sidebar-icon.png",
           "dark": "media/sidebar-icon.png"
@@ -389,7 +423,7 @@
       {
         "command": "continueYolo.openInNewWindow",
         "category": "Continue",
-        "title": "Open in new window",
+        "title": "Continue YOLO: Open in New Continue Column",
         "group": "Continue"
       }
     ],
@@ -520,25 +554,44 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "continueYolo.focusContinueInput"
-        },
-        {
-          "command": "continueYolo.focusContinueInputWithoutClear"
-        },
-        {
-          "command": "continueYolo.debugTerminal"
+          "command": "continueYolo.openLast"
         },
         {
           "command": "continueYolo.newSession"
         },
         {
-          "command": "continueYolo.enterEnterpriseLicenseKey"
-        },
-        {
-          "command": "continueYolo.generateRule"
-        },
-        {
           "command": "continueYolo.openInNewWindow"
+        },
+        {
+          "command": "continueYolo.openConfigPage"
+        },
+        {
+          "command": "continueYolo.focusContinueInput",
+          "when": "false"
+        },
+        {
+          "command": "continueYolo.focusContinueInputWithoutClear",
+          "when": "false"
+        },
+        {
+          "command": "continueYolo.debugTerminal",
+          "when": "false"
+        },
+        {
+          "command": "continueYolo.sidebar.open",
+          "when": "false"
+        },
+        {
+          "command": "continueYolo.editor.newSession",
+          "when": "false"
+        },
+        {
+          "command": "continueYolo.enterEnterpriseLicenseKey",
+          "when": "false"
+        },
+        {
+          "command": "continueYolo.generateRule",
+          "when": "false"
         }
       ],
       "editor/context": [
@@ -578,13 +631,18 @@
           "when": "view == continueYolo.continueGUIView"
         },
         {
-          "command": "continueYolo.viewHistory",
+          "command": "continueYolo.openInNewWindow",
           "group": "navigation@2",
           "when": "view == continueYolo.continueGUIView"
         },
         {
-          "command": "continueYolo.openConfigPage",
+          "command": "continueYolo.viewHistory",
           "group": "navigation@4",
+          "when": "view == continueYolo.continueGUIView"
+        },
+        {
+          "command": "continueYolo.openConfigPage",
+          "group": "navigation@5",
           "when": "view == continueYolo.continueGUIView"
         },
         {
@@ -607,6 +665,13 @@
       ]
     },
     "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "continueYoloSidebar",
+          "title": "Continue YOLO",
+          "icon": "media/sidebar-icon.png"
+        }
+      ],
       "panel": [
         {
           "id": "continueConsole",
@@ -616,6 +681,14 @@
       ]
     },
     "views": {
+      "continueYoloSidebar": [
+        {
+          "type": "webview",
+          "id": "continueYolo.continueGUIView",
+          "name": "Continue YOLO",
+          "icon": "media/sidebar-icon.png"
+        }
+      ],
       "continueConsole": [
         {
           "type": "webview",

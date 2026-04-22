@@ -19,6 +19,7 @@ import { TipTapEditor } from "./TipTapEditor";
 interface ContinueInputBoxProps {
   isLastUserInput: boolean;
   isMainInput?: boolean;
+  editable?: boolean;
   onEnter: (
     editorState: JSONContent,
     modifiers: InputModifiers,
@@ -128,6 +129,7 @@ function ContinueInputBox(props: ContinueInputBoxProps) {
             onEnter={props.onEnter}
             placeholder={placeholder}
             isMainInput={props.isMainInput ?? false}
+            editable={props.editable ?? true}
             availableContextProviders={filteredContextProviders}
             availableSlashCommands={filteredSlashCommands}
             historyKey={historyKey}

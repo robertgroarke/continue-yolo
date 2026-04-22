@@ -21,6 +21,7 @@ import {
 } from "../../redux/slices/sessionSlice";
 import { setDialogMessage, setShowDialog } from "../../redux/slices/uiSlice";
 import { refreshSessionMetadata } from "../../redux/thunks/session";
+import { getWorkspaceSharedLocalStorage } from "../../util/localStorage";
 import { getFontSize, getPlatform } from "../../util";
 import { ROUTES } from "../../util/navigation";
 import ConfirmationDialog from "../dialogs/ConfirmationDialog";
@@ -49,6 +50,19 @@ export function History() {
   const isSessionMetadataLoading = useAppSelector(
     (state) => state.session.isSessionMetadataLoading,
   );
+
+  useEffect(() => {
+    if (allSessionMetadata.length > 0) {
+      return;
+    }
+
+    const cachedSessionMetadata = getWorkspaceSharedLocalStorage(
+      "sessionMetadataCache",
+    );
+    if (cachedSessionMetadata?.length) {
+      dispatch(setAllSessionMetadata(cachedSessionMetadata));
+    }
+  }, [allSessionMetadata.length, dispatch]);
 
   useEffect(() => {
     try {

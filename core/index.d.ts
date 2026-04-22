@@ -281,6 +281,8 @@ export interface Session {
   title: string;
   workspaceDirectory: string;
   history: ChatHistoryItem[];
+  /** Optional: per-session tool permission mode */
+  permissionMode?: "ask" | "bypass";
   /** Optional: per-session UI mode (chat/agent/plan/background) */
   mode?: MessageModes;
   /** Optional: title of the selected chat model for this session */
@@ -817,6 +819,7 @@ export interface IdeSettings {
   userToken: string;
   continueTestEnvironment: "none" | "production" | "staging" | "local";
   pauseCodebaseIndexOnStart: boolean;
+  defaultPermissionMode?: "ask" | "bypass";
 }
 
 export interface FileStats {

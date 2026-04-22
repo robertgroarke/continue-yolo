@@ -4,6 +4,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Editor, JSONContent } from "@tiptap/react";
 import { ChatHistoryItem, InputModifiers } from "core";
+import { NEW_SESSION_TITLE } from "core/util/constants";
 import { renderChatMessage } from "core/util/messageContent";
 import {
   useCallback,
@@ -23,6 +24,7 @@ import ThinkingBlockPeek from "../../components/mainInput/belowMainInput/Thinkin
 import ContinueInputBox from "../../components/mainInput/ContinueInputBox";
 import { useOnboardingCard } from "../../components/OnboardingCard";
 import StepContainer from "../../components/StepContainer";
+import StyledMarkdownPreview from "../../components/StyledMarkdownPreview";
 import { TabBar } from "../../components/TabBar/TabBar";
 import { IdeMessengerContext } from "../../context/IdeMessenger";
 import { useWebviewListener } from "../../hooks/useWebviewListener";
@@ -83,6 +85,14 @@ const StepsDiv = styled.div`
   }
 `;
 
+const UserMessageBubble = styled.div`
+  margin: 0 8px 12px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--vscode-input-border);
+  background-color: ${vscBackground};
+  overflow: hidden;
+`;
+
 export const MAIN_EDITOR_INPUT_ID = "main-editor-input";
 
 function fallbackRender({ error, resetErrorBoundary }: any) {
@@ -141,6 +151,19 @@ export function Chat() {
   const jetbrains = useMemo(() => {
     return isJetBrains();
   }, []);
+  const initialSessionSummary = useMemo(
+    () =>
+      (window as any).continueInitialSessionSummary as
+        | { sessionId: string; title?: string }
+        | null
+        | undefined,
+    [],
+  );
+  const restoringSessionTitle =
+    initialSessionSummary?.title &&
+    initialSessionSummary.title !== NEW_SESSION_TITLE
+      ? initialSessionSummary.title
+      : undefined;
   const showEditorSessionTabs =
     showSessionTabs && !isInEdit && !(window as any).isEditorPanel;
 
@@ -317,24 +340,9 @@ export function Chat() {
     [dispatch],
   );
 
-  const isLastUserInput = useCallback(
-    (index: number): boolean => {
-      return !history
-        .slice(index + 1)
-        .some((entry) => entry.message.role === "user");
-    },
-    [history],
-  );
-
   const renderChatHistoryItem = useCallback(
     (item: ChatHistoryItemWithMessageId, index: number) => {
-      const {
-        message,
-        editorState,
-        contextItems,
-        appliedRules,
-        toolCallStates,
-      } = item;
+      const { message, toolCallStates } = item;
 
       // Calculate once for the entire function
       const latestSummaryIndex = findLatestSummaryIndex(history);
@@ -343,17 +351,14 @@ export function Chat() {
 
       if (message.role === "user") {
         return (
-          <ContinueInputBox
-            onEnter={(editorState, modifiers) =>
-              sendInput(editorState, modifiers, index)
-            }
-            isLastUserInput={isLastUserInput(index)}
-            isMainInput={false}
-            editorState={editorState ?? item.message.content}
-            contextItems={contextItems}
-            appliedRules={appliedRules}
-            inputId={message.id}
-          />
+          <UserMessageBubble
+            className={isBeforeLatestSummary ? "opacity-35" : ""}
+          >
+            <StyledMarkdownPreview
+              source={renderChatMessage(message)}
+              useParentBackgroundColor
+            />
+          </UserMessageBubble>
         );
       }
 
@@ -437,7 +442,7 @@ export function Chat() {
         </div>
       );
     },
-    [sendInput, isLastUserInput, history, stepsOpen, isStreaming],
+    [history, stepsOpen, isStreaming],
   );
 
   const showScrollbar = showChatScrollbar ?? true;
@@ -447,37 +452,46 @@ export function Chat() {
       {!!showEditorSessionTabs && <TabBar ref={tabsRef} />}
       {widget}
 
-      <StepsDiv
-        ref={stepsDivRef}
-        className={`min-h-0 overflow-y-auto pt-[8px] ${showScrollbar ? "thin-scrollbar" : "no-scrollbar"} ${history.length > 0 ? "flex-1" : ""}`}
-      >
-        {highlights}
-        {isRestoringSession && history.length === 0 && (
-          <div className="flex min-h-[40vh] items-center justify-center text-sm text-zinc-400">
-            Loading session...
-          </div>
-        )}
-        {history
-          .filter((item) => item.message.role !== "system")
-          .map((item, index: number) => (
-            <div
-              key={item.message.id}
-              style={{
-                minHeight: index === history.length - 1 ? "200px" : 0,
-              }}
-            >
-              <ErrorBoundary
-                FallbackComponent={fallbackRender}
-                onReset={() => {
-                  dispatch(newSession());
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        <StepsDiv
+          ref={stepsDivRef}
+          className={`min-h-0 pt-[8px] ${showScrollbar ? "thin-scrollbar overflow-y-scroll" : "no-scrollbar overflow-y-hidden"} ${history.length > 0 ? "flex-1" : ""}`}
+        >
+          {highlights}
+          {history
+            .filter((item) => item.message.role !== "system")
+            .map((item, index: number) => (
+              <div
+                key={item.message.id}
+                style={{
+                  minHeight: index === history.length - 1 ? "200px" : 0,
                 }}
               >
-                {renderChatHistoryItem(item, index)}
-              </ErrorBoundary>
-              {index === history.length - 1 && <InlineErrorMessage />}
+                <ErrorBoundary
+                  FallbackComponent={fallbackRender}
+                  onReset={() => {
+                    dispatch(newSession());
+                  }}
+                >
+                  {renderChatHistoryItem(item, index)}
+                </ErrorBoundary>
+                {index === history.length - 1 && <InlineErrorMessage />}
+              </div>
+            ))}
+        </StepsDiv>
+        {isRestoringSession && (
+          <div className="bg-vsc-editor-background/85 absolute inset-0 z-10 flex items-center justify-center backdrop-blur-[1px]">
+            <div className="flex flex-col items-center gap-2 text-sm text-zinc-300">
+              <span>Loading session...</span>
+              {restoringSessionTitle && (
+                <span className="max-w-[60ch] truncate text-xs text-zinc-500">
+                  {restoringSessionTitle}
+                </span>
+              )}
             </div>
-          ))}
-      </StepsDiv>
+          </div>
+        )}
+      </div>
       <div className={"relative"}>
         <ContinueInputBox
           isMainInput

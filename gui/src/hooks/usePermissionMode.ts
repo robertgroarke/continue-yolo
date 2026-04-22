@@ -1,44 +1,32 @@
-import { useEffect, useState } from "react";
-import { getLocalStorage, setLocalStorage } from "../util/localStorage";
-
-export type PermissionMode = "ask" | "bypass";
-
-const DEFAULT_PERMISSION_MODE: PermissionMode = "bypass";
-
-function getPermissionModeFromStorage(): PermissionMode {
-  return getLocalStorage("permissionMode") ?? DEFAULT_PERMISSION_MODE;
-}
+import { useContext } from "react";
+import { IdeMessengerContext } from "../context/IdeMessenger";
+import { useAppDispatch, useAppSelector } from "../redux/hooks";
+import {
+  setDefaultPermissionMode,
+  setPermissionMode as setSessionPermissionMode,
+} from "../redux/slices/sessionSlice";
 
 export function usePermissionMode() {
-  const [permissionMode, setPermissionModeState] = useState<PermissionMode>(
-    getPermissionModeFromStorage,
+  const dispatch = useAppDispatch();
+  const ideMessenger = useContext(IdeMessengerContext);
+  const permissionMode = useAppSelector(
+    (store) => store.session.permissionMode,
   );
 
-  useEffect(() => {
-    const handleLocalStorageChange = (event: CustomEvent) => {
-      if (event.detail?.key === "permissionMode") {
-        setPermissionModeState(
-          (event.detail.value as PermissionMode) ?? DEFAULT_PERMISSION_MODE,
-        );
-      }
-    };
+  const setPermissionMode = (mode: "ask" | "bypass") => {
+    dispatch(setSessionPermissionMode(mode));
+    dispatch(setDefaultPermissionMode(mode));
 
-    window.addEventListener(
-      "localStorageChange",
-      handleLocalStorageChange as EventListener,
-    );
-
-    return () => {
-      window.removeEventListener(
-        "localStorageChange",
-        handleLocalStorageChange as EventListener,
-      );
-    };
-  }, []);
-
-  const setPermissionMode = (mode: PermissionMode) => {
-    setLocalStorage("permissionMode", mode);
-    setPermissionModeState(mode);
+    void ideMessenger
+      .request("setDefaultPermissionMode", { mode })
+      .then((result) => {
+        if (result.status === "error") {
+          console.error(
+            "Failed to persist Continue YOLO default permission mode",
+            result.error,
+          );
+        }
+      });
   };
 
   const togglePermissionMode = () => {

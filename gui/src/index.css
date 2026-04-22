@@ -68,6 +68,36 @@ body {
 
 .thin-scrollbar {
   scrollbar-width: thin;
+  scrollbar-color: var(--vscode-scrollbarSlider-background)
+    var(--vscode-editor-background);
+  scrollbar-gutter: stable;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: var(--vscode-editor-background);
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--vscode-scrollbarSlider-background);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-hoverBackground);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.thin-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */

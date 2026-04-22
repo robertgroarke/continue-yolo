@@ -391,7 +391,7 @@ export function createEditorConfig(options: {
       },
     },
     content: props.editorState,
-    editable: !isStreaming || props.isMainInput,
+    editable: (props.editable ?? true) && (!isStreaming || props.isMainInput),
   });
 
   const onEnter = (modifiers: InputModifiers) => {

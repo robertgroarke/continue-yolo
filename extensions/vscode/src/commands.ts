@@ -51,6 +51,7 @@ import { openEditorAndRevealRange } from "./util/vscode";
 import { VsCodeIde } from "./VsCodeIde";
 
 type TelemetryCaptureParams = Parameters<typeof Telemetry.capture>;
+type PreferredLocation = "panel" | "sidebar";
 
 /**
  * Helper method to add the `isCommandEvent` to all telemetry captures
@@ -63,11 +64,57 @@ function captureCommandTelemetry(
 }
 
 async function focusGUI(sidebar: ContinueGUIWebviewViewProvider) {
+  const preferredLocation = getPreferredLocation();
+  if (preferredLocation === "sidebar") {
+    await sidebar.focusSidebar();
+    return;
+  }
   await sidebar.openEditorTab({ startMode: "restore" });
+}
+
+async function openPreferredChatSurface(
+  sidebar: ContinueGUIWebviewViewProvider,
+  options?: {
+    startMode?: "restore" | "new";
+    targetSessionId?: string;
+    targetSessionSummary?: { sessionId: string; title?: string };
+    forceNewPanel?: boolean;
+  },
+) {
+  const preferredLocation = getPreferredLocation();
+  const startMode = options?.startMode ?? "restore";
+
+  if (preferredLocation === "sidebar") {
+    await sidebar.focusSidebar({
+      startMode,
+      targetSessionId: options?.targetSessionId,
+      targetSessionSummary: options?.targetSessionSummary,
+    });
+    return;
+  }
+
+  await sidebar.openEditorTab({
+    forceNew: options?.forceNewPanel,
+    startMode,
+    initialSessionId: options?.targetSessionId,
+    initialSessionSummary: options?.targetSessionSummary,
+  });
 }
 
 function hideGUI(sidebar: ContinueGUIWebviewViewProvider) {
   sidebar.closeEditorTab();
+}
+
+function getPreferredLocation(): PreferredLocation {
+  return vscode.workspace
+    .getConfiguration(EXTENSION_NAME)
+    .get<PreferredLocation>("preferredLocation", "panel");
+}
+
+async function setPreferredLocation(location: PreferredLocation) {
+  await vscode.workspace
+    .getConfiguration(EXTENSION_NAME)
+    .update("preferredLocation", location, vscode.ConfigurationTarget.Global);
 }
 
 function waitForSidebarReady(
@@ -407,14 +454,39 @@ const getCommandsMap: (
       sidebar.webviewProtocol?.request("addModel", undefined);
     },
     "continueYolo.newSession": async () => {
-      await focusGUI(sidebar);
-      sidebar.webviewProtocol?.request("newSession", undefined);
+      await openPreferredChatSurface(sidebar, {
+        startMode: "new",
+      });
+    },
+    "continueYolo.openLast": async () => {
+      captureCommandTelemetry("openLast");
+      const sessionId = sidebar.getLastActiveSessionId();
+      const sessionSummary = sidebar.getLastActiveSessionSummary();
+      if (sessionId && sidebar.revealSessionPanel(sessionId)) {
+        return;
+      }
+      await openPreferredChatSurface(sidebar, {
+        startMode: "restore",
+        targetSessionId: sessionId,
+        targetSessionSummary: sessionSummary,
+      });
+    },
+    "continueYolo.sidebar.open": async () => {
+      captureCommandTelemetry("sidebarOpen");
+      await setPreferredLocation("sidebar");
+      await openPreferredChatSurface(sidebar, {
+        startMode: "restore",
+        targetSessionId: sidebar.getLastActiveSessionId(),
+        targetSessionSummary: sidebar.getLastActiveSessionSummary(),
+      });
     },
     "continueYolo.editor.newSession": async () => {
       captureCommandTelemetry("editorNewSession");
+      await setPreferredLocation("panel");
       await sidebar.openEditorTab({
         forceNew: true,
         startMode: "new",
+        preferCurrentViewColumn: true,
       });
     },
 
@@ -806,20 +878,24 @@ const getCommandsMap: (
       );
     },
     "continueYolo.openInNewWindow": async () => {
-      await focusGUI(sidebar);
-
-      const sessionId = await sidebar.webviewProtocol.request(
-        "getCurrentSessionId",
-        undefined,
-      );
+      const sessionId = sidebar.getLastActiveSessionId();
+      const sessionSummary = sidebar.getLastActiveSessionSummary();
+      await setPreferredLocation("panel");
       captureCommandTelemetry("openInNewWindow");
-      await sidebar.openEditorTab({ forceNew: true, startMode: "restore" });
-      if (sessionId) {
-        await vscode.commands.executeCommand(
-          "continueYolo.focusContinueSessionId",
-          sessionId,
-        );
+      if (
+        sessionId &&
+        sidebar.revealSessionPanel(sessionId, {
+          excludeActive: true,
+        })
+      ) {
+        return;
       }
+      await openPreferredChatSurface(sidebar, {
+        forceNewPanel: true,
+        startMode: "restore",
+        targetSessionId: sessionId,
+        targetSessionSummary: sessionSummary,
+      });
     },
     "continueYolo.forceNextEdit": async () => {
       captureCommandTelemetry("forceNextEdit");

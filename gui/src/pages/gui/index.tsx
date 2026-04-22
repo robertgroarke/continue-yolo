@@ -1,10 +1,12 @@
 import { History } from "../../components/History";
-import { useAppSelector } from "../../redux/hooks";
+import { useAppDispatch, useAppSelector } from "../../redux/hooks";
+import { refreshSessionMetadata } from "../../redux/thunks/session";
 import { Chat } from "./Chat";
 import { useEffect, useState } from "react";
 import { NEW_SESSION_TITLE } from "core/util/constants";
 
 export default function GUI() {
+  const dispatch = useAppDispatch();
   const historyLength = useAppSelector((state) => state.session.history.length);
   const isRestoringSession = useAppSelector(
     (state) => state.session.isRestoringSession,
@@ -13,6 +15,9 @@ export default function GUI() {
   const sessionId = useAppSelector((state) => state.session.id);
   const allSessionMetadata = useAppSelector(
     (state) => state.session.allSessionMetadata,
+  );
+  const isSessionMetadataLoading = useAppSelector(
+    (state) => state.session.isSessionMetadataLoading,
   );
   const [showEditorSessionPicker, setShowEditorSessionPicker] = useState(
     (window as any).isEditorPanel === true,
@@ -34,10 +39,27 @@ export default function GUI() {
     }
   }, [historyLength, sessionTitle, sessionId]);
 
-  const shouldShowHistoryPane =
-    !isRestoringSession &&
-    showEditorSessionPicker &&
-    allSessionMetadata.length > 0;
+  useEffect(() => {
+    if (
+      (window as any).isEditorPanel !== true ||
+      !showEditorSessionPicker ||
+      isRestoringSession ||
+      isSessionMetadataLoading ||
+      allSessionMetadata.length > 0
+    ) {
+      return;
+    }
+
+    void dispatch(refreshSessionMetadata({}));
+  }, [
+    allSessionMetadata.length,
+    dispatch,
+    isRestoringSession,
+    isSessionMetadataLoading,
+    showEditorSessionPicker,
+  ]);
+
+  const shouldShowHistoryPane = !isRestoringSession && showEditorSessionPicker;
 
   return (
     <div className="flex h-screen w-screen flex-row overflow-hidden">

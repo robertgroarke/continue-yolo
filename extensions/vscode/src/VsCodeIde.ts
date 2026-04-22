@@ -694,6 +694,10 @@ class VsCodeIde implements IDE {
         "pauseCodebaseIndexOnStart",
         false,
       ),
+      defaultPermissionMode: settings.get<"ask" | "bypass">(
+        "defaultPermissionMode",
+        "bypass",
+      ),
     };
     return ideSettings;
   }
