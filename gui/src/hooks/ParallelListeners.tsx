@@ -240,6 +240,11 @@ function ParallelListeners() {
 
       if (configResult.status === "success") {
         await handleConfigUpdate(true, configResult.content);
+        // Stop the retry loop once the IDE has answered, even if the inner
+        // config was interrupted/empty — handleConfigUpdate's own guards
+        // would otherwise leave hasDoneInitialConfigLoad false forever and
+        // pin the panel into a 2s polling loop that saturates IPC.
+        hasDoneInitialConfigLoad.current = true;
         emitRestoreTiming("webview.initialConfigLoad.success");
       }
       if (permissionModeResult.status === "success") {
@@ -252,6 +257,7 @@ function ParallelListeners() {
     }
     void bootstrapInitialSession();
     void initialLoadConfig();
+    let retries = 0;
     const interval = setInterval(() => {
       if (hasDoneInitialConfigLoad.current) {
         // Init to run on initial config load
@@ -260,6 +266,8 @@ function ParallelListeners() {
         void dispatch(refreshSessionMetadata({}));
 
         // This triggers sending pending status to the GUI for relevant docs indexes
+        clearInterval(interval);
+      } else if (retries++ >= 5) {
         clearInterval(interval);
       } else {
         void initialLoadConfig();

@@ -214,7 +214,33 @@ export const streamNormalInput = createAsyncThunk<
         );
       }
 
-      let next = await gen.next();
+      // No-chunk heartbeat: if the LLM stops sending chunks for this long,
+      // abort so the spinner doesn't pin forever (e.g. provider hang or
+      // saturated IPC bus). Picked generously to avoid killing slow models.
+      const STREAM_IDLE_TIMEOUT_MS = 60_000;
+      const nextWithTimeout = () =>
+        new Promise<IteratorResult<any>>((resolve, reject) => {
+          const timer = setTimeout(() => {
+            try {
+              streamAborter.abort();
+            } catch {
+              // ignore — best-effort cancel of the underlying HTTP stream
+            }
+            reject(new Error("stream idle timeout"));
+          }, STREAM_IDLE_TIMEOUT_MS);
+          gen.next().then(
+            (value) => {
+              clearTimeout(timer);
+              resolve(value);
+            },
+            (err) => {
+              clearTimeout(timer);
+              reject(err);
+            },
+          );
+        });
+
+      let next = await nextWithTimeout();
       while (!next.done) {
         if (!getState().session.isStreaming) {
           dispatch(abortStream());
@@ -222,7 +248,7 @@ export const streamNormalInput = createAsyncThunk<
         }
 
         dispatch(streamUpdate(next.value));
-        next = await gen.next();
+        next = await nextWithTimeout();
       }
 
       // Attach prompt log and end thinking for reasoning models
