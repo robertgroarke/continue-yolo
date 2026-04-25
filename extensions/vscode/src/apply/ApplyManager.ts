@@ -110,40 +110,75 @@ export class ApplyManager {
     toolCallId,
     isSearchAndReplace,
   }: ApplyToFilePayload & { filepath: string }) {
-    const fileExists = await this.ide.fileExists(filepath);
-    if (!fileExists) {
-      await this.ide.writeFile(filepath, "");
+    try {
+      const fileExists = await this.ide.fileExists(filepath);
+      if (!fileExists) {
+        // vscode.workspace.fs.writeFile does not auto-create parent
+        // directories. The non-bypass path used to mask this by opening the
+        // file in the editor first, which created the dir as a side effect.
+        await this.ensureParentDirectory(filepath);
+        await this.ide.writeFile(filepath, "");
+      }
+
+      const originalFileContent = await this.ide.readFile(filepath);
+
+      await this.webviewProtocol.request("updateApplyState", {
+        streamId,
+        status: "streaming",
+        fileContent: text,
+        originalFileContent,
+        filepath,
+        toolCallId,
+      });
+
+      const fileContent = await this.getPromptlessAppliedContent({
+        filepath,
+        originalFileContent,
+        text,
+        isSearchAndReplace,
+      });
+
+      await this.ide.writeFile(filepath, fileContent);
+
+      await this.webviewProtocol.request("updateApplyState", {
+        streamId,
+        status: "closed",
+        numDiffs: 0,
+        fileContent,
+        originalFileContent,
+        filepath,
+        toolCallId,
+      });
+    } catch (error) {
+      // Signal completion to the GUI so the apply state doesn't hang in
+      // "streaming" forever, then re-throw with the original message so the
+      // tool result surfaces a useful error to the model (otherwise it
+      // retries blindly and falls into a degenerate "let me try again" loop).
+      const message = error instanceof Error ? error.message : String(error);
+      try {
+        await this.webviewProtocol.request("updateApplyState", {
+          streamId,
+          status: "closed",
+          numDiffs: 0,
+          filepath,
+          toolCallId,
+        });
+      } catch {
+        // best-effort — original error is the important one
+      }
+      throw new Error(`Failed to apply changes to ${filepath}: ${message}`);
     }
+  }
 
-    const originalFileContent = await this.ide.readFile(filepath);
-
-    await this.webviewProtocol.request("updateApplyState", {
-      streamId,
-      status: "streaming",
-      fileContent: text,
-      originalFileContent,
-      filepath,
-      toolCallId,
+  private async ensureParentDirectory(fileUri: string): Promise<void> {
+    const uri = vscode.Uri.parse(fileUri);
+    const parent = uri.with({
+      path: uri.path.replace(/\/[^/]*$/, "") || "/",
     });
-
-    const fileContent = await this.getPromptlessAppliedContent({
-      filepath,
-      originalFileContent,
-      text,
-      isSearchAndReplace,
-    });
-
-    await this.ide.writeFile(filepath, fileContent);
-
-    await this.webviewProtocol.request("updateApplyState", {
-      streamId,
-      status: "closed",
-      numDiffs: 0,
-      fileContent,
-      originalFileContent,
-      filepath,
-      toolCallId,
-    });
+    if (parent.path === uri.path) {
+      return;
+    }
+    await vscode.workspace.fs.createDirectory(parent);
   }
 
   private async getPromptlessAppliedContent({
