@@ -295,10 +295,21 @@ class VsCodeIde implements IDE {
   }
 
   async writeFile(fileUri: string, contents: string): Promise<void> {
-    await vscode.workspace.fs.writeFile(
-      vscode.Uri.parse(fileUri),
-      Buffer.from(contents),
-    );
+    const uri = vscode.Uri.parse(fileUri);
+    // vscode.workspace.fs.writeFile does not auto-create parent directories,
+    // so do it here. Most callers (apply path, createNewFile tool) expect
+    // writeFile to "just work" and break in confusing ways otherwise.
+    const parent = uri.with({
+      path: uri.path.replace(/\/[^/]*$/, "") || "/",
+    });
+    if (parent.path !== uri.path) {
+      try {
+        await vscode.workspace.fs.createDirectory(parent);
+      } catch {
+        // best-effort — let the writeFile call surface the real error
+      }
+    }
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(contents));
   }
 
   async removeFile(fileUri: string): Promise<void> {

@@ -24,7 +24,9 @@ export const createNewFileImpl: ToolImpl = async (args, extras) => {
       );
     }
     await extras.ide.writeFile(resolvedFileUri, contents);
-    await extras.ide.openFile(resolvedFileUri);
+    // Don't pop the file open in the editor — Continue YOLO runs in agent
+    // mode where unsolicited editor pop-ups are disruptive. The user can
+    // click the file name in the chat to open it on demand.
     await extras.ide.saveFile(resolvedFileUri);
     if (extras.codeBaseIndexer) {
       void extras.codeBaseIndexer?.refreshCodebaseIndexFiles([resolvedFileUri]);
