@@ -590,6 +590,7 @@ describe("streamResponseThunk - tool calls", () => {
       },
     ];
     initialState.session.id = "session-123";
+    initialState.session.permissionMode = "ask";
     initialState.ui.toolSettings = {
       [grepName]: "allowedWithPermission", // Requires manual approval
     };
@@ -1095,6 +1096,7 @@ describe("streamResponseThunk - tool calls", () => {
         contextItems: [],
       },
     ];
+    initialState.session.permissionMode = "ask";
     initialState.ui.toolSettings = {
       [grepName]: "allowedWithPermission", // Requires manual approval
     };
@@ -1938,6 +1940,7 @@ describe("streamResponseThunk - tool calls", () => {
           contextItems: [],
         },
       ];
+      initialState.session.permissionMode = "ask";
       initialState.ui.toolSettings = {
         [terminalName]: "allowedWithoutPermission",
       };
@@ -2029,6 +2032,7 @@ describe("streamResponseThunk - tool calls", () => {
           contextItems: [],
         },
       ];
+      initialState.session.permissionMode = "ask";
       initialState.ui.toolSettings = {
         [terminalName]: "allowedWithPermission",
       };
@@ -2131,6 +2135,7 @@ describe("streamResponseThunk - tool calls", () => {
           contextItems: [],
         },
       ];
+      initialState.session.permissionMode = "ask";
       const someTool = {
         ...grepTool,
         function: {
@@ -2241,6 +2246,7 @@ describe("streamResponseThunk - tool calls", () => {
     it("should properly handle disabled commands and show error status", async () => {
       // Setup store with runTerminalCommand tool
       const initialState = getRootStateWithClaude();
+      initialState.session.permissionMode = "ask";
       initialState.config.config.tools = [terminalTool];
       initialState.ui.toolSettings = {
         runTerminalCommand: "allowedWithPermission",

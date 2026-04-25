@@ -158,6 +158,8 @@ export const applyForEditTool = createAsyncThunk<
   ThunkApiType
 >("apply/editTool", async (payload, { dispatch, getState, extra }) => {
   const { toolCallId, streamId } = payload;
+  const state = getState();
+  const autoAccept = state.session.permissionMode === "bypass";
   dispatch(
     updateApplyState({
       streamId,
@@ -168,7 +170,10 @@ export const applyForEditTool = createAsyncThunk<
 
   let didError = false;
   try {
-    const response = await extra.ideMessenger.request("applyToFile", payload);
+    const response = await extra.ideMessenger.request("applyToFile", {
+      ...payload,
+      autoAccept,
+    });
     if (response.status === "error") {
       didError = true;
     }

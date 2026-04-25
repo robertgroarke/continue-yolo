@@ -1,5 +1,9 @@
 // core/llm/toolSupport.test.ts
-import { PROVIDER_TOOL_SUPPORT, isRecommendedAgentModel } from "./toolSupport";
+import {
+  PROVIDER_TOOL_SUPPORT,
+  isRecommendedAgentModel,
+  modelSupportsNativeTools,
+} from "./toolSupport";
 
 describe("PROVIDER_TOOL_SUPPORT", () => {
   describe("continue-proxy", () => {
@@ -274,6 +278,17 @@ describe("PROVIDER_TOOL_SUPPORT", () => {
       expect(supportsFn("LLAMA3.1")).toBe(true);
       expect(supportsFn("MIXTRAL-8x7b")).toBe(true);
       expect(supportsFn("VISION")).toBe(false);
+    });
+
+    it("should not allow config capabilities to force native tools for known unsupported cloud models", () => {
+      expect(
+        modelSupportsNativeTools({
+          provider: "ollama",
+          model: "glm-5.1:cloud",
+          title: "GLM5.1",
+          capabilities: { tools: true },
+        } as any),
+      ).toBe(false);
     });
   });
 

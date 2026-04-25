@@ -5,6 +5,7 @@ import {
   Cog6ToothIcon,
   KeyIcon,
 } from "@heroicons/react/24/outline";
+import { renderChatMessage } from "core/util/messageContent";
 import { useContext, useMemo } from "react";
 import { GhostButton, SecondaryButton } from "../../components";
 import { useEditModel } from "../../components/mainInput/Lump/useEditBlock";
@@ -15,6 +16,7 @@ import { IdeMessengerContext } from "../../context/IdeMessenger";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
 import { selectSelectedChatModel } from "../../redux/slices/configSlice";
 import { selectSelectedProfile } from "../../redux/slices/profilesSlice";
+import { ChatHistoryItemWithMessageId } from "../../redux/slices/sessionSlice";
 import { setDialogMessage, setShowDialog } from "../../redux/slices/uiSlice";
 import { streamResponseThunk } from "../../redux/thunks/streamResponse";
 import { isLocalProfile } from "../../util";
@@ -23,6 +25,53 @@ import { OutOfCreditsDialog } from "./OutOfCreditsDialog";
 
 interface StreamErrorProps {
   error: unknown;
+}
+
+function getRetryPayload(
+  history: ChatHistoryItemWithMessageId[],
+  mainEditor: ReturnType<typeof useMainEditor>["mainEditor"],
+) {
+  let index = -1;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].message.role === "user") {
+      index = i;
+      break;
+    }
+  }
+
+  if (index === -1) {
+    if (!mainEditor) {
+      return undefined;
+    }
+
+    return {
+      editorState: mainEditor.getJSON(),
+      index: 0,
+    };
+  }
+
+  const historyItem = history[index];
+  const fallbackText = renderChatMessage(historyItem.message);
+  const editorState =
+    historyItem.editorState ??
+    ({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: fallbackText
+            ? [
+                {
+                  type: "text",
+                  text: fallbackText,
+                },
+              ]
+            : [],
+        },
+      ],
+    } as const);
+
+  return { editorState, index };
 }
 
 const StreamErrorDialog = ({ error }: StreamErrorProps) => {
@@ -82,33 +131,20 @@ const StreamErrorDialog = ({ error }: StreamErrorProps) => {
     <GhostButton
       className="flex items-center"
       onClick={() => {
-        let index = -1;
-        for (let i = history.length - 1; i >= 0; i--) {
-          if (
-            history[i].message.role === "user" ||
-            history[i].message.role === "tool"
-          ) {
-            index = i;
-            break;
-          }
-        }
-
-        if (!mainEditor) {
+        const retryPayload = getRetryPayload(history, mainEditor);
+        if (!retryPayload) {
           console.error("Main editor not found, cannot resubmit message.");
           return;
         }
 
-        const editorState =
-          index === -1 ? mainEditor.getJSON() : history[index].editorState;
-
         void dispatch(
           streamResponseThunk({
-            editorState,
+            editorState: retryPayload.editorState,
             modifiers: {
               noContext: true,
               useCodebase: false,
             },
-            index: index === -1 ? 0 : index,
+            index: retryPayload.index,
           }),
         );
         dispatch(setShowDialog(false));

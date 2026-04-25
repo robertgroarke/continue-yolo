@@ -31,7 +31,19 @@ export class ApplyManager {
     text,
     toolCallId,
     isSearchAndReplace,
+    autoAccept,
   }: ApplyToFilePayload) {
+    if (autoAccept && filepath) {
+      await this.applyToFileWithoutPrompt({
+        streamId,
+        filepath,
+        text,
+        toolCallId,
+        isSearchAndReplace,
+      });
+      return;
+    }
+
     if (filepath) {
       await this.ensureFileOpen(filepath);
     }
@@ -89,6 +101,96 @@ export class ApplyManager {
       await this.ide.openFile(filepath);
     }
     await this.ide.openFile(filepath);
+  }
+
+  private async applyToFileWithoutPrompt({
+    streamId,
+    filepath,
+    text,
+    toolCallId,
+    isSearchAndReplace,
+  }: ApplyToFilePayload & { filepath: string }) {
+    const fileExists = await this.ide.fileExists(filepath);
+    if (!fileExists) {
+      await this.ide.writeFile(filepath, "");
+    }
+
+    const originalFileContent = await this.ide.readFile(filepath);
+
+    await this.webviewProtocol.request("updateApplyState", {
+      streamId,
+      status: "streaming",
+      fileContent: text,
+      originalFileContent,
+      filepath,
+      toolCallId,
+    });
+
+    const fileContent = await this.getPromptlessAppliedContent({
+      filepath,
+      originalFileContent,
+      text,
+      isSearchAndReplace,
+    });
+
+    await this.ide.writeFile(filepath, fileContent);
+
+    await this.webviewProtocol.request("updateApplyState", {
+      streamId,
+      status: "closed",
+      numDiffs: 0,
+      fileContent,
+      originalFileContent,
+      filepath,
+      toolCallId,
+    });
+  }
+
+  private async getPromptlessAppliedContent({
+    filepath,
+    originalFileContent,
+    text,
+    isSearchAndReplace,
+  }: {
+    filepath: string;
+    originalFileContent: string;
+    text: string;
+    isSearchAndReplace?: boolean;
+  }): Promise<string> {
+    if (isSearchAndReplace || !originalFileContent.trim()) {
+      return text;
+    }
+
+    const { config } = await this.configHandler.loadConfig();
+    const llm =
+      config?.selectedModelByRole.apply ?? config?.selectedModelByRole.chat;
+    if (!llm) {
+      throw new Error(`No model with roles "apply" or "chat" found in config.`);
+    }
+
+    const abortManager = ApplyAbortManager.getInstance();
+    const abortController = abortManager.get(filepath);
+    const { diffLinesGenerator } = await applyCodeBlock(
+      originalFileContent,
+      text,
+      getUriPathBasename(filepath),
+      llm,
+      abortController,
+    );
+
+    const lines: string[] = [];
+    for await (const line of diffLinesGenerator) {
+      if (abortController.signal.aborted) {
+        return originalFileContent;
+      }
+      if (line.type === "same" || line.type === "new") {
+        lines.push(line.line);
+      }
+    }
+
+    const shouldEndWithNewline =
+      originalFileContent.endsWith("\n") || text.endsWith("\n");
+    return lines.join("\n") + (shouldEndWithNewline ? "\n" : "");
   }
 
   private modelIsTooFastForStreaming(model: string): boolean {

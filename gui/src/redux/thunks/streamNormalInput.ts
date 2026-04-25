@@ -331,12 +331,15 @@ export const streamNormalInput = createAsyncThunk<
       generatedCalls3,
       toolPolicies,
     );
+    const isBypassPermissions = state3.session.permissionMode === "bypass";
     const autoApprovedPolicies = policies.filter(
-      ({ policy }) => policy === "allowedWithoutPermission",
+      ({ policy }) =>
+        policy === "allowedWithoutPermission" ||
+        (isBypassPermissions && policy === "allowedWithPermission"),
     );
-    const needsApprovalPolicies = policies.filter(
-      ({ policy }) => policy === "allowedWithPermission",
-    );
+    const needsApprovalPolicies = isBypassPermissions
+      ? []
+      : policies.filter(({ policy }) => policy === "allowedWithPermission");
 
     // 4. Execute remaining tool calls
     if (originalToolCalls.length === 0) {

@@ -1,7 +1,9 @@
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { useContext } from "react";
+import { renderChatMessage } from "core/util/messageContent";
 import { IdeMessengerContext } from "../../context/IdeMessenger";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
+import { ChatHistoryItemWithMessageId } from "../../redux/slices/sessionSlice";
 import { setInlineErrorMessage } from "../../redux/slices/sessionSlice";
 import { streamResponseThunk } from "../../redux/thunks/streamResponse";
 import { useMainEditor } from "./TipTapEditor";
@@ -13,6 +15,53 @@ export type InlineErrorMessageType =
       message: string;
     };
 
+function getRetryPayload(
+  history: ChatHistoryItemWithMessageId[],
+  mainEditor: ReturnType<typeof useMainEditor>["mainEditor"],
+) {
+  let index = -1;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].message.role === "user") {
+      index = i;
+      break;
+    }
+  }
+
+  if (index === -1) {
+    if (!mainEditor) {
+      return undefined;
+    }
+
+    return {
+      editorState: mainEditor.getJSON(),
+      index: 0,
+    };
+  }
+
+  const historyItem = history[index];
+  const fallbackText = renderChatMessage(historyItem.message);
+  const editorState =
+    historyItem.editorState ??
+    ({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: fallbackText
+            ? [
+                {
+                  type: "text",
+                  text: fallbackText,
+                },
+              ]
+            : [],
+        },
+      ],
+    } as const);
+
+  return { editorState, index };
+}
+
 export default function InlineErrorMessage() {
   const dispatch = useAppDispatch();
   const ideMessenger = useContext(IdeMessengerContext);
@@ -23,33 +72,20 @@ export default function InlineErrorMessage() {
   const history = useAppSelector((state) => state.session.history);
 
   const retryLastMessage = () => {
-    let index = -1;
-    for (let i = history.length - 1; i >= 0; i--) {
-      if (
-        history[i].message.role === "user" ||
-        history[i].message.role === "tool"
-      ) {
-        index = i;
-        break;
-      }
-    }
-
-    if (!mainEditor) {
-      console.error("Main editor not found, cannot retry last message.");
+    const retryPayload = getRetryPayload(history, mainEditor);
+    if (!retryPayload) {
+      console.error("Retry payload not found, cannot retry last message.");
       return;
     }
 
-    const editorState =
-      index === -1 ? mainEditor.getJSON() : history[index].editorState;
-
     void dispatch(
       streamResponseThunk({
-        editorState,
+        editorState: retryPayload.editorState,
         modifiers: {
           noContext: true,
           useCodebase: false,
         },
-        index: index === -1 ? 0 : index,
+        index: retryPayload.index,
       }),
     );
   };

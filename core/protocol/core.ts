@@ -230,6 +230,14 @@ export type ToCoreFromIdeOrWebviewProtocol = {
     string,
   ];
   "llm/listModels": [{ title: string }, string[] | undefined];
+  "models/fetch": [
+    {
+      provider: string;
+      apiKey?: string;
+      apiBase?: string;
+    },
+    string[],
+  ];
   "llm/streamChat": [
     {
       messages: ChatMessage[];

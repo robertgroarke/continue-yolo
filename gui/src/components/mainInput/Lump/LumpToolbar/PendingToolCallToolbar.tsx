@@ -53,7 +53,7 @@ export function PendingToolCallToolbar() {
     }
   }, [dispatch, isBypassPermissions, pendingToolCalls]);
 
-  if (pendingToolCalls.length === 0) {
+  if (pendingToolCalls.length === 0 || isBypassPermissions) {
     return null;
   }
 

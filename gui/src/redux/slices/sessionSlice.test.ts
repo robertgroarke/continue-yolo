@@ -76,6 +76,9 @@ describe("sessionSlice streamUpdate", () => {
     newestToolbarPreviewForInput: {},
     isSessionMetadataLoading: false,
     compactionLoading: {},
+    isRestoringSession: false,
+    permissionMode: "bypass" as const,
+    defaultPermissionMode: "bypass" as const,
   });
 
   describe("Basic Chat Message", () => {

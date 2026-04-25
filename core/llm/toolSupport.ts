@@ -1,6 +1,38 @@
 import { parseProxyModelName } from "@continuedev/config-yaml";
 import { ModelDescription } from "..";
 
+const OLLAMA_CLOUD_NATIVE_TOOL_UNSUPPORTED_PREFIXES = [
+  "cogito-2.1",
+  "deepseek-v3.2",
+  "gemini-3-flash-preview",
+  "glm-4.6",
+  "glm-4.7",
+  "glm-5",
+  "kimi-k2.5",
+  "minimax-m2",
+  "minimax-m2.5",
+  "minimax-m2.7",
+];
+
+function getOllamaModelName(model: string): string {
+  if (!model.includes("/")) {
+    return model;
+  }
+
+  const parts = model.split("/");
+  return parts[parts.length - 1];
+}
+
+function isOllamaCloudModelWithoutNativeTools(model: string): boolean {
+  const modelName = getOllamaModelName(model).toLowerCase();
+  return (
+    modelName.includes(":cloud") &&
+    OLLAMA_CLOUD_NATIVE_TOOL_UNSUPPORTED_PREFIXES.some((part) =>
+      modelName.startsWith(part),
+    )
+  );
+}
+
 export const PROVIDER_TOOL_SUPPORT: Record<string, (model: string) => boolean> =
   {
     "continue-proxy": (model) => {
@@ -151,34 +183,12 @@ export const PROVIDER_TOOL_SUPPORT: Record<string, (model: string) => boolean> =
     },
     // https://ollama.com/search?c=tools
     ollama: (model) => {
-      let modelName = "";
-      // Extract the model name after the last slash to support other registries
-      if (model.includes("/")) {
-        let parts = model.split("/");
-        modelName = parts[parts.length - 1];
-      } else {
-        modelName = model;
-      }
+      const modelName = getOllamaModelName(model);
 
       // Some Ollama cloud models don't support tools despite matching the
       // family-name heuristic below (https://ollama.com/search?c=cloud)
-      if (modelName.toLowerCase().includes(":cloud")) {
-        if (
-          [
-            "cogito-2.1",
-            "deepseek-v3.2",
-            "gemini-3-flash-preview",
-            "glm-4.6",
-            "glm-4.7",
-            "glm-5",
-            "kimi-k2.5",
-            "minimax-m2",
-            "minimax-m2.5",
-            "minimax-m2.7",
-          ].some((part) => modelName.toLowerCase().startsWith(part))
-        ) {
-          return false;
-        }
+      if (isOllamaCloudModelWithoutNativeTools(modelName)) {
+        return false;
       }
 
       if (
@@ -536,6 +546,13 @@ export function isRecommendedAgentModel(modelName: string): boolean {
   return false;
 }
 export function modelSupportsNativeTools(modelDescription: ModelDescription) {
+  if (
+    modelDescription.provider === "ollama" &&
+    isOllamaCloudModelWithoutNativeTools(modelDescription.model)
+  ) {
+    return false;
+  }
+
   if (modelDescription.capabilities?.tools !== undefined) {
     return modelDescription.capabilities.tools;
   }

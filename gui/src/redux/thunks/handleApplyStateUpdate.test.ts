@@ -417,6 +417,11 @@ describe("applyForEditTool", () => {
     vi.clearAllMocks();
     mockDispatch = vi.fn();
     mockGetState = vi.fn();
+    mockGetState.mockReturnValue({
+      session: {
+        permissionMode: "ask",
+      },
+    });
     mockExtra = {
       ideMessenger: {
         request: vi.fn(),
@@ -449,7 +454,38 @@ describe("applyForEditTool", () => {
       );
       expect(mockExtra.ideMessenger.request).toHaveBeenCalledWith(
         "applyToFile",
-        payload,
+        {
+          ...payload,
+          autoAccept: false,
+        },
+      );
+    });
+
+    it("should auto-accept apply when permission mode is bypass", async () => {
+      const payload: ApplyToFilePayload & { toolCallId: string } = {
+        toolCallId: "test-tool-call",
+        streamId: "test-stream",
+        filepath: "test.txt",
+        text: "new content",
+        isSearchAndReplace: true,
+      };
+
+      mockGetState.mockReturnValue({
+        session: {
+          permissionMode: "bypass",
+        },
+      });
+      mockExtra.ideMessenger.request.mockResolvedValue({ status: "success" });
+
+      const thunk = applyForEditTool(payload);
+      await thunk(mockDispatch, mockGetState, mockExtra);
+
+      expect(mockExtra.ideMessenger.request).toHaveBeenCalledWith(
+        "applyToFile",
+        {
+          ...payload,
+          autoAccept: true,
+        },
       );
     });
   });
@@ -476,7 +512,11 @@ describe("applyForEditTool", () => {
 
       vi.mocked(selectToolCallById).mockReturnValue(toolCallState);
       vi.mocked(selectApplyStateByToolCallId).mockReturnValue(applyState);
-      mockGetState.mockReturnValue({});
+      mockGetState.mockReturnValue({
+        session: {
+          permissionMode: "ask",
+        },
+      });
 
       mockExtra.ideMessenger.request.mockRejectedValue(
         new Error("Request failed"),
@@ -523,7 +563,11 @@ describe("applyForEditTool", () => {
 
       vi.mocked(selectToolCallById).mockReturnValue(toolCallState);
       vi.mocked(selectApplyStateByToolCallId).mockReturnValue(applyState);
-      mockGetState.mockReturnValue({});
+      mockGetState.mockReturnValue({
+        session: {
+          permissionMode: "ask",
+        },
+      });
 
       mockExtra.ideMessenger.request.mockResolvedValue({ status: "error" });
 
@@ -568,7 +612,11 @@ describe("applyForEditTool", () => {
 
       vi.mocked(selectToolCallById).mockReturnValue(toolCallState);
       vi.mocked(selectApplyStateByToolCallId).mockReturnValue(applyState);
-      mockGetState.mockReturnValue({});
+      mockGetState.mockReturnValue({
+        session: {
+          permissionMode: "ask",
+        },
+      });
 
       mockExtra.ideMessenger.request.mockRejectedValue(
         new Error("Request failed"),
@@ -602,7 +650,11 @@ describe("applyForEditTool", () => {
 
       vi.mocked(selectToolCallById).mockReturnValue(toolCallState);
       vi.mocked(selectApplyStateByToolCallId).mockReturnValue(applyState);
-      mockGetState.mockReturnValue({});
+      mockGetState.mockReturnValue({
+        session: {
+          permissionMode: "ask",
+        },
+      });
 
       mockExtra.ideMessenger.request.mockRejectedValue(
         new Error("Request failed"),
@@ -629,7 +681,11 @@ describe("applyForEditTool", () => {
         status: "streaming",
         streamId: "test-stream",
       });
-      mockGetState.mockReturnValue({});
+      mockGetState.mockReturnValue({
+        session: {
+          permissionMode: "ask",
+        },
+      });
 
       mockExtra.ideMessenger.request.mockRejectedValue(
         new Error("Request failed"),
@@ -652,7 +708,11 @@ describe("applyForEditTool", () => {
       };
 
       vi.mocked(selectApplyStateByToolCallId).mockReturnValue(undefined); // Apply state not found
-      mockGetState.mockReturnValue({});
+      mockGetState.mockReturnValue({
+        session: {
+          permissionMode: "ask",
+        },
+      });
 
       mockExtra.ideMessenger.request.mockRejectedValue(
         new Error("Request failed"),
@@ -694,7 +754,10 @@ describe("applyForEditTool", () => {
 
         expect(mockExtra.ideMessenger.request).toHaveBeenCalledWith(
           "applyToFile",
-          payload,
+          {
+            ...payload,
+            autoAccept: false,
+          },
         );
         expect(updateApplyState).toHaveBeenCalledWith({
           streamId: payload.streamId,

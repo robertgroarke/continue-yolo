@@ -9,6 +9,8 @@ import {
   getContinueWorkspaceConfig,
 } from "../util/workspaceConfig";
 
+const STATUS_BAR_NAME = "Continue YOLO";
+
 export enum StatusBarStatus {
   Disabled,
   Enabled,
@@ -48,29 +50,29 @@ const statusBarItemText = (
   error?: boolean,
 ) => {
   if (error) {
-    return "$(alert) Continue (config error)";
+    return `$(alert) ${STATUS_BAR_NAME} (config error)`;
   }
 
   let text: string;
   switch (status) {
     case undefined:
       if (loading) {
-        text = "$(loading~spin) Continue";
+        text = `$(loading~spin) ${STATUS_BAR_NAME}`;
       } else {
-        text = "Continue";
+        text = STATUS_BAR_NAME;
       }
       break;
     case StatusBarStatus.Disabled:
-      text = "$(circle-slash) Continue";
+      text = `$(circle-slash) ${STATUS_BAR_NAME}`;
       break;
     case StatusBarStatus.Enabled:
-      text = "$(check) Continue";
+      text = `$(check) ${STATUS_BAR_NAME}`;
       break;
     case StatusBarStatus.Paused:
-      text = "$(debug-pause) Continue";
+      text = `$(debug-pause) ${STATUS_BAR_NAME}`;
       break;
     default:
-      text = "Continue";
+      text = STATUS_BAR_NAME;
   }
 
   // Append Next Edit indicator if enabled.
